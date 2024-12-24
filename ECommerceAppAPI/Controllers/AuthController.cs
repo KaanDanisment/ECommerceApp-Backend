@@ -1,6 +1,7 @@
 ﻿using Business.Abstract;
 using Core.Entities.Concrete;
 using Core.Utilities.Results.Concrete;
+using Core.Utilities.Security.jwt;
 using Entities.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -24,14 +25,14 @@ namespace ECommerceAppAPI.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login(UserLoginDto userLoginDto)
         {
-            var login = await _authManager.LoginAsync(userLoginDto);
+            var login = await _authManager.LoginAsync(userLoginDto).ConfigureAwait(false);
             if (!login.Success)
             {
-                if(login is ErrorDataResult<User> errorDataResult)
+                if (login is ErrorDataResult<User> errorDataResult)
                 {
-                    if(errorDataResult.ErrorType == "BadRequest")
+                    if (errorDataResult.ErrorType == "BadRequest")
                     {
-                        return BadRequest(new {login.Message});
+                        return BadRequest(new { login.Message });
                     }
                     else if (errorDataResult.ErrorType == "SystemError")
                     {
@@ -39,15 +40,27 @@ namespace ECommerceAppAPI.Controllers
                     }
                 }
             }
-            var jwtToken = await _authManager.CreateJwtTokenAsync(login.Data);
+            var jwtToken = await _authManager.CreateJwtTokenAsync(login.Data).ConfigureAwait(false);
             if (!jwtToken.Success)
             {
-                return StatusCode(500,new {jwtToken.Message});
+                if (jwtToken is ErrorDataResult<AccessToken> errorDataResult)
+                {
+                    if (errorDataResult.ErrorType == "SystemError")
+                    {
+                        return StatusCode(500, errorDataResult.Message);
+                    }
+                }
             }
-            var refreshToken = await _authManager.CreateRefreshTokenAsync(login.Data);
+            var refreshToken = await _authManager.CreateRefreshTokenAsync(login.Data).ConfigureAwait(false);
             if (!refreshToken.Success)
             {
-                return StatusCode(500, new {refreshToken.Message});
+                if (refreshToken is ErrorDataResult<AccessToken> errorDataResult)
+                {
+                    if (errorDataResult.ErrorType == "SystemError")
+                    {
+                        return StatusCode(500, errorDataResult.Message);
+                    }
+                }
             }
             var cookieOptions = new CookieOptions
             {
@@ -57,7 +70,7 @@ namespace ECommerceAppAPI.Controllers
                 Expires = DateTime.UtcNow.AddHours(1)
             };
             Response.Cookies.Append("AccessToken", jwtToken.Data.Token, cookieOptions);
-            Response.Cookies.Append("RefreshToken",refreshToken.Data, cookieOptions);
+            Response.Cookies.Append("RefreshToken", refreshToken.Data, cookieOptions);
 
             return Ok();
         }
@@ -66,21 +79,21 @@ namespace ECommerceAppAPI.Controllers
         public async Task<IActionResult> RefreshToken()
         {
             var refreshToken = Request.Cookies["RefreshToken"];
-            if (string.IsNullOrEmpty(refreshToken)) return NotFound("Refresh token not found");
+            if (string.IsNullOrEmpty(refreshToken)) return NotFound(new { Message = "Refresh token not found" });
 
-            var tokenIsValid =  await _authManager.ValidateRefreshTokenAsync(refreshToken);
-            if(!tokenIsValid.Success)
+            var tokenIsValid = await _authManager.ValidateRefreshTokenAsync(refreshToken).ConfigureAwait(false);
+            if (!tokenIsValid.Success)
             {
-                return NotFound(new {tokenIsValid.Message});
+                return NotFound(new { Message = tokenIsValid.Message });
             }
 
             User user = tokenIsValid.Data;
-            var newJwtToken = await _authManager.CreateJwtTokenAsync(user);
-            var newRefreshToken = await _authManager.CreateRefreshTokenAsync(user);
+            var newJwtToken = await _authManager.CreateJwtTokenAsync(user).ConfigureAwait(false);
+            var newRefreshToken = await _authManager.CreateRefreshTokenAsync(user).ConfigureAwait(false);
 
-            if (!newJwtToken.Success && !newRefreshToken.Success)
+            if (!newJwtToken.Success || !newRefreshToken.Success)
             {
-                return NotFound("Tokens can not created");
+                return NotFound(new { Message = "Tokens can not created" });
             }
 
             var cookieOptions = new CookieOptions
@@ -99,22 +112,22 @@ namespace ECommerceAppAPI.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register(UserRegisterDto userRegisterDto)
         {
-            var userExist = await _authManager.UserExist(userRegisterDto.Email);
+            var userExist = await _authManager.UserExist(userRegisterDto.Email).ConfigureAwait(false);
             if (!userExist.Success)
             {
                 return BadRequest(new { Message = userExist.Message });
             }
 
-            var register = await _authManager.RegisterAsync(userRegisterDto);
+            var register = await _authManager.RegisterAsync(userRegisterDto).ConfigureAwait(false);
             if (!register.Success)
             {
-                if(register is ErrorDataResult<UserRegisterDto> errorDataResult)
+                if (register is ErrorDataResult<UserRegisterDto> errorDataResult)
                 {
-                    if(errorDataResult.ErrorType == "BadRequest")
+                    if (errorDataResult.ErrorType == "BadRequest")
                     {
                         return BadRequest(new { Message = register.Message });
                     }
-                    else if(errorDataResult.ErrorType == "SystemError")
+                    else if (errorDataResult.ErrorType == "SystemError")
                     {
                         return StatusCode(500, errorDataResult.Message);
                     }
@@ -127,10 +140,10 @@ namespace ECommerceAppAPI.Controllers
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
-            var user = await _userManager.GetUserAsync(User);
-            if(user != null)
+            var user = await _userManager.GetUserAsync(User).ConfigureAwait(false);
+            if (user != null)
             {
-                await _userManager.RemoveAuthenticationTokenAsync(user, "CustomRefreshToken", "RefreshToken");
+                await _userManager.RemoveAuthenticationTokenAsync(user, "CustomRefreshToken", "RefreshToken").ConfigureAwait(false);
             }
 
             var cookieOptions = new CookieOptions
@@ -141,8 +154,8 @@ namespace ECommerceAppAPI.Controllers
                 Expires = DateTime.UtcNow.AddDays(-1)
             };
 
-            Response.Cookies.Delete("AccessToken",cookieOptions);
-            Response.Cookies.Delete("RefreshToken",cookieOptions);
+            Response.Cookies.Delete("AccessToken", cookieOptions);
+            Response.Cookies.Delete("RefreshToken", cookieOptions);
 
             return Ok();
         }
@@ -155,7 +168,7 @@ namespace ECommerceAppAPI.Controllers
 
             if (accessToken != null && refreshToken != null)
             {
-                var refreshTokenIsValid = await _authManager.ValidateRefreshTokenAsync(refreshToken);
+                var refreshTokenIsValid = await _authManager.ValidateRefreshTokenAsync(refreshToken).ConfigureAwait(false);
                 if (refreshTokenIsValid.Success)
                 {
                     return Ok(true);

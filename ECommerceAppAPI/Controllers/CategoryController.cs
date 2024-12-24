@@ -19,7 +19,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var result = await _categoryManager.GetAllAsync();
+            var result = await _categoryManager.GetAllAsync().ConfigureAwait(false);
             if (result.Success)
             {
                 return Ok(result.Data);
@@ -30,7 +30,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var result = await _categoryManager.GetByIdAsync(id);
+            var result = await _categoryManager.GetByIdAsync(id).ConfigureAwait(false);
             if (result.Success)
             {
                 return Ok(result.Data);
@@ -41,7 +41,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> Add(CategoryCreateDto categoryCreateDto)
         {
-            var result = await _categoryManager.AddAsync(categoryCreateDto);
+            var result = await _categoryManager.AddAsync(categoryCreateDto).ConfigureAwait(false);
             if (result.Success)
             {
                 return CreatedAtAction(nameof(GetById), new { id = ((CategoryCreateDto)result.Data).Id }, result);
@@ -52,8 +52,8 @@ namespace ECommerceAppAPI.Controllers
         [HttpPut]
         public async Task<IActionResult> Update(CategoryUpdateDto categoryUpdateDto)
         {
-            var result = await _categoryManager.UpdateAsync(categoryUpdateDto);
-            if(result.Success)
+            var result = await _categoryManager.UpdateAsync(categoryUpdateDto).ConfigureAwait(false);
+            if (result.Success)
             {
                 return Ok(result);
             }
@@ -63,7 +63,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var result = await _categoryManager.DeleteAsync(id);
+            var result = await _categoryManager.DeleteAsync(id).ConfigureAwait(false);
             if (result.Success)
             {
                 return Ok(result);

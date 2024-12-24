@@ -21,19 +21,24 @@ namespace DataAccess.Concrete.EntityFramework
 
         public async Task AddRangeAsync(IEnumerable<Image> images)
         {
-            await _context.Images.AddRangeAsync(images);
+            await _context.Images.AddRangeAsync(images).ConfigureAwait(false);
         }
 
         public async Task DeleteByProductIdAsync(int productId)
         {
-            IEnumerable<Image> images = await _context.Images.Where(image => image.ProductId == productId).ToListAsync();
+            IEnumerable<Image> images = await _context.Images
+                .Where(image => image.ProductId == productId)
+                .ToListAsync()
+                .ConfigureAwait(false);
             _context.Images.RemoveRange(images);
         }
 
         public async Task<IEnumerable<Image>> GetImagesByProductIdAsync(int ProductId)
         {
-            return await _context.Images.Where(image =>  image.ProductId == ProductId).ToListAsync();
-            
+            return await _context.Images
+                .Where(image => image.ProductId == ProductId)
+                .ToListAsync()
+                .ConfigureAwait(false);
         }
     }
 }

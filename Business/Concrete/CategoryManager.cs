@@ -23,27 +23,27 @@ namespace Business.Concrete
 
         public async Task<IDataResult<CategoryCreateDto>> AddAsync(CategoryCreateDto categoryCreateDto)
         {
-            Category category = await _unitOfWork.Categories.GetAsync(c => c.Name == categoryCreateDto.Name);
+            Category category = await _unitOfWork.Categories.GetAsync(c => c.Name == categoryCreateDto.Name).ConfigureAwait(false);
             if (category == null)
             {
                 Category newCategory = new Category()
                 {
                     Name = categoryCreateDto.Name
                 };
-                await _unitOfWork.Categories.AddAsync(newCategory);
-                await _unitOfWork.SaveChangesAsync();
-                return new SuccessDataResult<CategoryCreateDto>(categoryCreateDto,"Category added succesfully!");
+                await _unitOfWork.Categories.AddAsync(newCategory).ConfigureAwait(false);
+                await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
+                return new SuccessDataResult<CategoryCreateDto>(categoryCreateDto, "Category added succesfully!");
             }
             return new ErrorDataResult<CategoryCreateDto>("This category added before!");
         }
 
         public async Task<IResult> DeleteAsync(int id)
         {
-            Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == id);
+            Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == id).ConfigureAwait(false);
             if (category != null)
             {
-                await _unitOfWork.Categories.DeleteAsync(category);
-                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.Categories.DeleteAsync(category).ConfigureAwait(false);
+                await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
                 return new SuccessResult("Category Deleted Suucesfully!");
             }
 
@@ -52,8 +52,8 @@ namespace Business.Concrete
 
         public async Task<IDataResult<IEnumerable<CategoryDto>>> GetAllAsync()
         {
-            IEnumerable<Category> categories = await _unitOfWork.Categories.GetAllAsync();
-            if(categories == null)
+            IEnumerable<Category> categories = await _unitOfWork.Categories.GetAllAsync().ConfigureAwait(false);
+            if (categories == null)
             {
                 return new ErrorDataResult<IEnumerable<CategoryDto>>("Kategori bulunamdı!");
             }
@@ -68,12 +68,12 @@ namespace Business.Concrete
 
         public async Task<IDataResult<CategoryDto>> GetByIdAsync(int id)
         {
-            Category category = await _unitOfWork.Categories.GetAsync(c => c.Id==id);
-            if(category != null)
+            Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == id).ConfigureAwait(false);
+            if (category != null)
             {
                 CategoryDto categoryDto = new CategoryDto()
                 {
-                    Id=category.Id,
+                    Id = category.Id,
                     Name = category.Name
                 };
                 return new SuccessDataResult<CategoryDto>(categoryDto);
@@ -83,14 +83,14 @@ namespace Business.Concrete
 
         public async Task<IResult> UpdateAsync(CategoryUpdateDto categoryUpdateDto)
         {
-            Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == categoryUpdateDto.Id);
-            if(category != null)
+            Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == categoryUpdateDto.Id).ConfigureAwait(false);
+            if (category != null)
             {
                 category.Name = categoryUpdateDto.Name;
-                await _unitOfWork.Categories.UpdateAsync(category);
-                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.Categories.UpdateAsync(category).ConfigureAwait(false);
+                await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
 
-                return new SuccessDataResult<CategoryUpdateDto>(categoryUpdateDto,"Category updated successfully!");
+                return new SuccessDataResult<CategoryUpdateDto>(categoryUpdateDto, "Category updated successfully!");
             }
             return new ErrorResult("Category could not be updated!");
         }

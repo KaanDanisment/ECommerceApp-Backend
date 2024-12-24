@@ -21,8 +21,10 @@ namespace DataAccess.Concrete.EntityFramework
 
         public async Task<IEnumerable<Subcategory>> GetSubcategoriesByCategoryId(int categoryId)
         {
-            return await _context.Subcategories.Where(subcategory => subcategory.CategoryId == categoryId).ToListAsync();
+            return await _context.Subcategories
+                .Where(subcategory => subcategory.CategoryId == categoryId)
+                .ToListAsync()
+                .ConfigureAwait(false);
         }
-
     }
 }

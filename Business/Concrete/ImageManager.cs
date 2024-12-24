@@ -24,7 +24,7 @@ namespace Business.Concrete
         {
             List<Image> imagesList = new List<Image>();
 
-            foreach(var image in images)
+            foreach (var image in images)
             {
                 Image newImage = new Image()
                 {
@@ -33,15 +33,15 @@ namespace Business.Concrete
                 };
                 imagesList.Add(newImage);
             }
-            await _unitOfWork.Images.AddRangeAsync(imagesList);
-            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.Images.AddRangeAsync(imagesList).ConfigureAwait(false);
+            await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
             return new SuccessDataResult<IEnumerable<Image>>(images);
         }
 
         public async Task<IResult> DeleteAsync(int productId)
         {
-            await _unitOfWork.Images.DeleteByProductIdAsync(productId);
-            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.Images.DeleteByProductIdAsync(productId).ConfigureAwait(false);
+            await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
             return new SuccessResult("Image Deleted Succesfully");
         }
 

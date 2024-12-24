@@ -40,45 +40,64 @@ namespace Business.Concrete
 
         public async Task<IDataResult<AccessToken>> CreateJwtTokenAsync(User user)
         {
-            var token = await _tokenHelper.CreateTokenAsync(user);
-            if (token == null)
+            try
             {
-                return new ErrorDataResult<AccessToken>("Token could not created");
+                var token = await _tokenHelper.CreateTokenAsync(user).ConfigureAwait(false);
+
+                return new SuccessDataResult<AccessToken>(token, "Token created successfuly!");
             }
-            return new SuccessDataResult<AccessToken>(token, "Token created successfuly!");
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorDataResult<AccessToken>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
         }
 
         public async Task<IDataResult<string>> CreateRefreshTokenAsync(User user)
         {
-            var token = await _refreshTokenHelper.GenerateAndStoreRefreshTokenAsync(user);
-            if (token == null)
+            try
             {
-                return new ErrorDataResult<string>("Refresh Token could not created");
+                var token = await _refreshTokenHelper.GenerateAndStoreRefreshTokenAsync(user).ConfigureAwait(false);
+
+                return new SuccessDataResult<string>(token, "Token created");
             }
-            return new SuccessDataResult<string>(token, "Token created");
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorDataResult<string>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+
         }
 
         public async Task<IDataResult<User>> LoginAsync(UserLoginDto userLoginDto)
         {
             var validator = new UserLoginDtoValidator();
-            var validationResult = await validator.ValidateAsync(userLoginDto);
+            var validationResult = await validator.ValidateAsync(userLoginDto).ConfigureAwait(false);
             if (!validationResult.IsValid)
             {
-                var validationError = validationResult.Errors.FirstOrDefault();
-                if (validationError != null)
-                {
-                    return new ErrorDataResult<User>(validationError.ErrorMessage, "BadRequest");
-                }
+                var errorMessage = validationResult.Errors.Select(e => e.ErrorMessage).FirstOrDefault();
+                return new ErrorDataResult<User>(errorMessage, "BadRequest");
+
             }
-            var user = await _userManager.FindByEmailAsync(userLoginDto.Email);
+            var user = await _userManager.FindByEmailAsync(userLoginDto.Email).ConfigureAwait(false);
             if (user == null) { return new ErrorDataResult<User>("Mail adresi kayıtlı değil! Lütfen kayıt olun.", "BadRequest"); }
 
-            var result = await _signInManager.CheckPasswordSignInAsync(user, userLoginDto.Password, false);
+            var result = await _signInManager.CheckPasswordSignInAsync(user, userLoginDto.Password, false).ConfigureAwait(false);
             if (!result.Succeeded) { return new ErrorDataResult<User>("Hatalı şifre! Lütfen tekrar deneyin.", "BadRequest"); }
 
             try
             {
-                await _signInManager.SignInAsync(user, isPersistent: true);
+                await _signInManager.SignInAsync(user, isPersistent: true).ConfigureAwait(false);
+
+                return new SuccessDataResult<User>(user, "Successful login");
             }
             catch (Exception ex)
             {
@@ -90,26 +109,23 @@ namespace Business.Concrete
                 return new ErrorDataResult<User>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
             }
 
-            return new SuccessDataResult<User>(user, "Successful login");
+
         }
 
         public async Task<IDataResult<UserRegisterDto>> RegisterAsync(UserRegisterDto userRegisterDto)
         {
-            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            var validator = new UserRegisterDtoValidator();
+            var validationResult = await validator.ValidateAsync(userRegisterDto).ConfigureAwait(false);
+            if (!validationResult.IsValid)
+            {
+                var errorMessage = validationResult.Errors.Select(e => e.ErrorMessage).FirstOrDefault();
+                return new ErrorDataResult<UserRegisterDto>(errorMessage, "BadRequest");
+
+            }
+
+            using var transaction = await _unitOfWork.BeginTransactionAsync().ConfigureAwait(false);
             try
             {
-
-                var validator = new UserRegisterDtoValidator();
-                var validationResult = await validator.ValidateAsync(userRegisterDto);
-                if (!validationResult.IsValid)
-                {
-                    var valiadaitonError = validationResult.Errors.FirstOrDefault();
-                    if (valiadaitonError != null)
-                    {
-                        return new ErrorDataResult<UserRegisterDto>(valiadaitonError.ErrorMessage, "BadRequest");
-                    }
-                }
-
                 User user = new User()
                 {
                     FirstName = userRegisterDto.FirstName,
@@ -119,7 +135,7 @@ namespace Business.Concrete
                     PhoneNumber = userRegisterDto.PhoneNumber,
                 };
 
-                var identityResult = await _userManager.CreateAsync(user, userRegisterDto.Password);
+                var identityResult = await _userManager.CreateAsync(user, userRegisterDto.Password).ConfigureAwait(false);
                 if (!identityResult.Succeeded)
                 {
                     var identityError = identityResult.Errors.FirstOrDefault();
@@ -129,33 +145,23 @@ namespace Business.Concrete
                     }
                 }
 
-                if (!await _roleManager.RoleExistsAsync("User"))
+                if (!await _roleManager.RoleExistsAsync("User").ConfigureAwait(false))
                 {
                     var role = new Role { Name = "User" };
-                    var createRoleResult = await _roleManager.CreateAsync(role);
-                    if (!createRoleResult.Succeeded)
-                    {
-                        var errorDetails = createRoleResult.Errors.Select(e => new { e.Code, e.Description });
-                        var errorMessages = System.Text.Json.JsonSerializer.Serialize(errorDetails);
-                        return new ErrorDataResult<UserRegisterDto>(errorMessages, "SystemError");
-                    }
+                    await _roleManager.CreateAsync(role).ConfigureAwait(false);
+
                 }
 
-                var addRoleToUser = await _userManager.AddToRoleAsync(user, "User");
-                if (!addRoleToUser.Succeeded)
-                {
-                    var errorDetails = string.Join(", ", addRoleToUser.Errors.Select(e => e.Description));
-                    var roleAssignmentErrors = System.Text.Json.JsonSerializer.Serialize(errorDetails);
-                    return new ErrorDataResult<UserRegisterDto>(roleAssignmentErrors, "SystemError");
-                }
+                await _userManager.AddToRoleAsync(user, "User").ConfigureAwait(false);
 
-                await transaction.CommitAsync();
+
+                await transaction.CommitAsync().ConfigureAwait(false);
 
                 return new SuccessDataResult<UserRegisterDto>(userRegisterDto, "User created successfuly");
             }
             catch (DbUpdateException dbEx)
             {
-                await transaction.RollbackAsync();
+                await transaction.RollbackAsync().ConfigureAwait(false);
 
                 var errorDetails = new
                 {
@@ -164,9 +170,18 @@ namespace Business.Concrete
                 };
                 return new ErrorDataResult<UserRegisterDto>(userRegisterDto, System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
             }
+            catch (InvalidOperationException InvalidEx)
+            {
+                var errorDetails = new
+                {
+                    Message = InvalidEx.Message,
+                    InnerException = InvalidEx.InnerException?.Message
+                };
+                return new ErrorDataResult<UserRegisterDto>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
+                await transaction.RollbackAsync().ConfigureAwait(false);
                 var errorDetails = new
                 {
                     Message = ex.Message,
@@ -174,36 +189,60 @@ namespace Business.Concrete
                 };
                 return new ErrorDataResult<UserRegisterDto>(userRegisterDto, System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
             }
-
         }
 
         public async Task<IResult> UserExist(string email)
         {
-            if (await _userManager.Users.AnyAsync(user => user.Email == email))
+            try
             {
-                return new ErrorResult("Bu mail adresi kayıtlı! Giriş yapın veya başka bir mail adresi ile kayıt olun.");
+                if (await _userManager.Users.AnyAsync(user => user.Email == email).ConfigureAwait(false))
+                {
+                    return new ErrorResult("Bu mail adresi kayıtlı! Giriş yapın veya başka bir mail adresi ile kayıt olun.");
+                }
+                return new SuccessResult();
             }
-            return new SuccessResult();
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorResult(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
         }
 
         public async Task<IDataResult<User>> ValidateRefreshTokenAsync(string refreshToken)
         {
-            var userToken = await _unitOfWork.UserTokens.GetAsync(t =>
-
-               t.LoginProvider == "CustomRefreshToken" &&
-               t.Name == "RefreshToken" &&
-               t.Value == refreshToken);
-            if (userToken == null)
+            try
             {
-                return new ErrorDataResult<User>("Invalid or expired refresh token");
+                var userToken = await _unitOfWork.UserTokens.GetAsync(t =>
+                       t.LoginProvider == "CustomRefreshToken" &&
+                       t.Name == "RefreshToken" &&
+                       t.Value == refreshToken).ConfigureAwait(false);
+
+                if (userToken == null)
+                {
+                    return new ErrorDataResult<User>("Invalid or expired refresh token");
+                }
+
+                User user = await _userManager.FindByIdAsync(userToken.UserId).ConfigureAwait(false);
+                if (user == null)
+                {
+                    return new ErrorDataResult<User>("Invalid or expired refresh token");
+                }
+                return new SuccessDataResult<User>(user);
+            }
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorDataResult<User>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
             }
 
-            User user = await _userManager.FindByIdAsync(userToken.UserId);
-            if (user == null)
-            {
-                return new ErrorDataResult<User>("Invalid or expired refresh token");
-            }
-            return new SuccessDataResult<User>(user);
         }
     }
 }

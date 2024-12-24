@@ -26,27 +26,24 @@ namespace Business.Concrete
 
         public async Task<IDataResult<OrderCreateDto>> CreateAsync(OrderCreateDto orderCreateDto)
         {
-
             Order order = new Order()
             {
                 UserId = orderCreateDto.UserdId,
                 TotalPrice = orderCreateDto.UnitPrice,
             };
-            await _unitOfWork.Orders.AddAsync(order);
-            await _unitOfWork.SaveChangesAsync();
-
-         
+            await _unitOfWork.Orders.AddAsync(order).ConfigureAwait(false);
+            await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
 
             return new SuccessDataResult<OrderCreateDto>(orderCreateDto, "Order created succsesfully!");
         }
 
         public async Task<IResult> DeleteAsync(int id)
         {
-            Order order = await _unitOfWork.Orders.GetAsync(o => o.Id == id);
-            if(order != null)
+            Order order = await _unitOfWork.Orders.GetAsync(o => o.Id == id).ConfigureAwait(false);
+            if (order != null)
             {
-                await _unitOfWork.Orders.DeleteAsync(order);
-                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.Orders.DeleteAsync(order).ConfigureAwait(false);
+                await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
                 return new SuccessResult("Order deleted successfuly!");
             }
             return new ErrorResult("Order not found!");
@@ -54,7 +51,7 @@ namespace Business.Concrete
 
         public async Task<IDataResult<IEnumerable<OrderDto>>> GetAllAsync()
         {
-            IEnumerable<Order> orders = await _unitOfWork.Orders.GetAllAsync();
+            IEnumerable<Order> orders = await _unitOfWork.Orders.GetAllAsync().ConfigureAwait(false);
             IEnumerable<OrderDto> orderDtos = orders.Select(o => new OrderDto()
             {
                 OrderId = o.Id,
@@ -68,8 +65,8 @@ namespace Business.Concrete
 
         public async Task<IDataResult<OrderDto>> GetByIdAsync(int id)
         {
-            Order order = await _unitOfWork.Orders.GetAsync(o => o.Id == id);
-            if(order != null)
+            Order order = await _unitOfWork.Orders.GetAsync(o => o.Id == id).ConfigureAwait(false);
+            if (order != null)
             {
                 OrderDto orderDo = new OrderDto()
                 {
@@ -86,12 +83,12 @@ namespace Business.Concrete
 
         public async Task<IResult> UpdateOrderStatusAsync(int orderId, string status)
         {
-            Order order = await _unitOfWork.Orders.GetAsync(o =>  orderId == o.Id);
-            if(order != null)
+            Order order = await _unitOfWork.Orders.GetAsync(o => orderId == o.Id).ConfigureAwait(false);
+            if (order != null)
             {
                 order.Status = status;
-                await _unitOfWork.Orders.UpdateAsync(order);
-                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.Orders.UpdateAsync(order).ConfigureAwait(false);
+                await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
 
                 return new SuccessResult("Status updated successfuly");
             }

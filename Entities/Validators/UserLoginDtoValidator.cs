@@ -13,12 +13,12 @@ namespace Entities.Validators
     {
         public UserLoginDtoValidator() 
         {
-            RuleFor(user => user.Email)
+            RuleFor(user => user.Email).Cascade(CascadeMode.Stop)
                 .NotEmpty().WithMessage("Lütfen mail adresinizi girin.")
                 .EmailAddress().WithMessage("Lütfen Geçerli bir mail adresi girin!");
 
-            RuleFor(user => user.Password)
-                .NotEmpty().WithMessage("Lütfen şifrenizi girin");
+            RuleFor(user => user.Password).Cascade(CascadeMode.Stop)
+                .NotEmpty().WithMessage("Lütfen şifrenizi girin.");
         }
     }
 }

@@ -10,12 +10,11 @@ using System.Threading.Tasks;
 
 namespace DataAccess.Core.Concrete.EntityFramework
 {
-    public class EfGenericRepositoryBase<TEntity,TContext> : IGenericRepository<TEntity>
-        where TEntity : class, new()
-        where TContext : DbContext
+    public class EfGenericRepositoryBase<TEntity, TContext> : IGenericRepository<TEntity>
+            where TEntity : class, new()
+            where TContext : DbContext
     {
         private readonly TContext _context;
-
 
         public EfGenericRepositoryBase(TContext context)
         {
@@ -24,7 +23,7 @@ namespace DataAccess.Core.Concrete.EntityFramework
 
         public async Task AddAsync(TEntity entity)
         {
-            await _context.Set<TEntity>().AddAsync(entity);
+            await _context.Set<TEntity>().AddAsync(entity).ConfigureAwait(false);
         }
 
         public async Task DeleteAsync(TEntity entity)
@@ -34,12 +33,14 @@ namespace DataAccess.Core.Concrete.EntityFramework
 
         public async Task<IEnumerable<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>> filter = null)
         {
-            return filter == null ? await _context.Set<TEntity>().ToListAsync() : await _context.Set<TEntity>().Where(filter).ToListAsync();
+            return filter == null
+                ? await _context.Set<TEntity>().ToListAsync().ConfigureAwait(false)
+                : await _context.Set<TEntity>().Where(filter).ToListAsync().ConfigureAwait(false);
         }
 
         public async Task<TEntity?> GetAsync(Expression<Func<TEntity, bool>> filter)
         {
-            return await _context.Set<TEntity>().SingleOrDefaultAsync(filter);
+            return await _context.Set<TEntity>().SingleOrDefaultAsync(filter).ConfigureAwait(false);
         }
 
         public async Task UpdateAsync(TEntity entity)

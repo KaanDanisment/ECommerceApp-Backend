@@ -333,3 +333,4 @@ C:\Users\kaand\source\repos\ECommerceAppAPI\ECommerceAppAPI\obj\Debug\net8.0\ref
 C:\Users\kaand\source\repos\ECommerceAppAPI\ECommerceAppAPI\bin\Debug\net8.0\FluentValidation.dll
 C:\Users\kaand\source\repos\ECommerceAppAPI\ECommerceAppAPI\bin\Debug\net8.0\FluentValidation.AspNetCore.dll
 C:\Users\kaand\source\repos\ECommerceAppAPI\ECommerceAppAPI\bin\Debug\net8.0\FluentValidation.DependencyInjectionExtensions.dll
+C:\Users\kaand\source\repos\ECommerceAppAPI\ECommerceAppAPI\obj\Debug\net8.0\ECommerceAppAPI.sourcelink.json

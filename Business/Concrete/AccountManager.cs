@@ -4,6 +4,7 @@ using Core.Utilities.Results.Abstract;
 using Core.Utilities.Results.Concrete;
 using DataAccess.Abstract;
 using Entities.Dtos;
+using Entities.Validators;
 using Microsoft.AspNetCore.Identity;
 using System;
 using System.Collections.Generic;
@@ -36,11 +37,11 @@ namespace Business.Concrete
             };
 
             var result = await this.GetUsersAdressesAsync(user);
-            if(!result.Success && result.Data == null)
+            if (!result.Success && result.Data == null)
             {
                 return new ErrorDataResult<UserDto>(result.Message);
             }
-            else 
+            else
             {
                 userDto.Addresses = result.Data;
                 return new SuccessDataResult<UserDto>(userDto);
@@ -49,6 +50,13 @@ namespace Business.Concrete
 
         public async Task<IResult> CreateAddressAsync(AddressDto addressDto, User user)
         {
+            var validator = new AddressDtoValidator();
+            var validationResult = await validator.ValidateAsync(addressDto).ConfigureAwait(false);
+            if (!validationResult.IsValid)
+            {
+                var errorMessage = validationResult.Errors.Select(e => e.ErrorMessage).FirstOrDefault();
+                return new ErrorResult(errorMessage, "BadRequest");
+            }
             try
             {
                 Address address = new Address()
@@ -86,6 +94,7 @@ namespace Business.Concrete
                 }
                 IEnumerable<AddressDto> addressDtos = addresses.Select(a => new AddressDto()
                 {
+                    Id = a.Id,
                     AddressLine = a.AddressLine,
                     AddressLine2 = a.AddressLine2,
                     City = a.City,
@@ -105,8 +114,16 @@ namespace Business.Concrete
             }
         }
 
-        public async Task<IResult> UpdateUserAsync(User user,UserDto userDto)
+        public async Task<IResult> UpdateUserAsync(User user, UserDto userDto)
         {
+            var validator = new UserDtoValidator();
+            var validationResult = await validator.ValidateAsync(userDto).ConfigureAwait(false);
+            if (!validationResult.IsValid)
+            {
+                var errorMessage = validationResult.Errors.Select(e => e.ErrorMessage).FirstOrDefault();
+                return new ErrorDataResult<UserRegisterDto>(errorMessage, "BadRequest");
+
+            }
             try
             {
                 user.FirstName = userDto.FirstName;
@@ -127,7 +144,32 @@ namespace Business.Concrete
 
                 return new SuccessResult("Güncelleme işlemi başarılı");
 
-            }catch (Exception ex)
+            }
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorResult(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+        }
+
+        public async Task<IResult> DeleteAddressAsync(AddressDto addressDto)
+        {
+            try
+            {
+                Address address = await _unitOfWork.Addresses.GetAsync(a => a.Id == addressDto.Id);
+                if (address == null)
+                {
+                    return new ErrorResult("Adres bulunamadı", "NotFound");
+                }
+                await _unitOfWork.Addresses.DeleteAsync(address);
+                await _unitOfWork.SaveChangesAsync();
+                return new SuccessResult("Adres başarıyla silindi");
+            }
+            catch (Exception ex)
             {
                 var errorDetails = new
                 {

@@ -17,6 +17,22 @@
   },
   {
     "ContainingType": "ECommerceAppAPI.Controllers.AccountController",
+    "Method": "DeleteAddress",
+    "RelativePath": "api/Account/deleteaddress",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "addressDto",
+        "Type": "Entities.Dtos.AddressDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "ECommerceAppAPI.Controllers.AccountController",
     "Method": "GetUserAddresses",
     "RelativePath": "api/Account/getuseraddresses",
     "HttpMethod": "GET",

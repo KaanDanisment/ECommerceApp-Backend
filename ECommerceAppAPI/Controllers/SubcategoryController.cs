@@ -21,7 +21,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAllSubcategories()
         {
-            var result = await _subcategoryManager.GetAllSubcategoriesAsync();
+            var result = await _subcategoryManager.GetAllSubcategoriesAsync().ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<SubcategoryDto> errorDataResult)
@@ -39,7 +39,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetSubcategorieById(int id)
         {
-            var result = await _subcategoryManager.GetSubcategoryByIdAsync(id);
+            var result = await _subcategoryManager.GetSubcategoryByIdAsync(id).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<SubcategoryDto> errorDataResult)
@@ -60,7 +60,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet("getallbycategoryid/{id}")]
         public async Task<IActionResult> GetAllSubcategoriesByCategoryId(int id)
         {
-            var result = await _subcategoryManager.GetAllSubcategoriesByCategoryIdAsync(id);
+            var result = await _subcategoryManager.GetAllSubcategoriesByCategoryIdAsync(id).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<IEnumerable<SubcategoryDto>> errorDataResult)
@@ -82,7 +82,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> Add(SubcategoryCreateDto subcategoryCreateDto)
         {
-            var result = await _subcategoryManager.AddSubcategoryAsync(subcategoryCreateDto);
+            var result = await _subcategoryManager.AddSubcategoryAsync(subcategoryCreateDto).ConfigureAwait(false);
             if (result.Success)
             {
                 return CreatedAtAction(nameof(GetSubcategorieById), new { id = ((SubcategoryCreateDto)result.Data).Id }, result);
@@ -93,7 +93,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpPut]
         public async Task<IActionResult> Update(SubcategoryUpdateDto subcategoryUpdateDto)
         {
-            var result = await _subcategoryManager.UpdateSubcategoryAsync(subcategoryUpdateDto);
+            var result = await _subcategoryManager.UpdateSubcategoryAsync(subcategoryUpdateDto).ConfigureAwait(false);
             if (result.Success)
             {
                 return Ok(result);
@@ -104,7 +104,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var result = await _subcategoryManager.DeleteSubcategoryAsync(id);
+            var result = await _subcategoryManager.DeleteSubcategoryAsync(id).ConfigureAwait(false);
             if (result.Success)
             {
                 return Ok(result);

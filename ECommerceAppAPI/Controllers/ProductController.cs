@@ -19,7 +19,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet]
         public async Task<IActionResult> GetlAll()
         {
-            var result = await _productManager.GetAllAsync();
+            var result = await _productManager.GetAllAsync().ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<ProductDto> errorDataResult)
@@ -37,7 +37,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var result = await _productManager.GetByIdAsync(id);
+            var result = await _productManager.GetByIdAsync(id).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<ProductDto> errorDataResult)
@@ -58,7 +58,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> Add(ProductCreateDto productCreateDto)
         {
-            var result = await _productManager.AddAsync(productCreateDto);
+            var result = await _productManager.AddAsync(productCreateDto).ConfigureAwait(false);
             if (result.Success)
             {
                 return CreatedAtAction(nameof(GetById), new { id = ((ProductCreateDto)result.Data).Id }, result);
@@ -69,7 +69,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpPut]
         public async Task<IActionResult> Update(ProductUpdateDto productUpdateDto)
         {
-            var result = await _productManager.UpdateAsync(productUpdateDto);
+            var result = await _productManager.UpdateAsync(productUpdateDto).ConfigureAwait(false);
             if (result.Success)
             {
                 return Ok(result);
@@ -80,7 +80,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var result = await _productManager.DeleteAsync(id);
+            var result = await _productManager.DeleteAsync(id).ConfigureAwait(false);
             if (result.Success)
             {
                 return Ok(result);
@@ -91,7 +91,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet("getbycategoryid/{categoryId}")]
         public async Task<IActionResult> GetProductsByCategoryId(int categoryId)
         {
-            var result = await _productManager.GetProductsByCategoryId(categoryId);
+            var result = await _productManager.GetProductsByCategoryId(categoryId).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<IEnumerable<ProductDto>> errorDataResult)
@@ -113,7 +113,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet("getbysubcategoryid/{subcategoryId}")]
         public async Task<IActionResult> GetProductsBySubcategoryId(int subcategoryId)
         {
-            var result = await _productManager.GetProductsBySubcategoryId(subcategoryId);
+            var result = await _productManager.GetProductsBySubcategoryId(subcategoryId).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<IEnumerable<ProductDto>> errorDataResult)
@@ -135,7 +135,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet("getlatestproducts")]
         public async Task<IActionResult> GetLatestProducts()
         {
-            var result = await _productManager.GetLatestProductsAsync();
+            var result = await _productManager.GetLatestProductsAsync().ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<ProductDto> errorDataResult)

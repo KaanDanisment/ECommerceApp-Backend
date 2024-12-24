@@ -34,3 +34,4 @@ C:\Users\kaand\source\repos\ECommerceAppAPI\Core\obj\Debug\net8.0\Core.dll
 C:\Users\kaand\source\repos\ECommerceAppAPI\Core\obj\Debug\net8.0\refint\Core.dll
 C:\Users\kaand\source\repos\ECommerceAppAPI\Core\obj\Debug\net8.0\Core.pdb
 C:\Users\kaand\source\repos\ECommerceAppAPI\Core\obj\Debug\net8.0\ref\Core.dll
+C:\Users\kaand\source\repos\ECommerceAppAPI\Core\obj\Debug\net8.0\Core.sourcelink.json

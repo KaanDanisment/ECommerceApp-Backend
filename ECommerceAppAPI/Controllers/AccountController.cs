@@ -31,13 +31,13 @@ namespace ECommerceAppAPI.Controllers
             {
                 return Unauthorized("Kullanıcı bulunamadı.");
             }
-            var user = await _authManager.ValidateRefreshTokenAsync(refreshToken);
+            var user = await _authManager.ValidateRefreshTokenAsync(refreshToken).ConfigureAwait(false);
             if (!user.Success)
             {
                 return Unauthorized(new { Message = user.Message });
             }
 
-            var userInfos = await _accountManager.GetUserInfos(user.Data);
+            var userInfos = await _accountManager.GetUserInfos(user.Data).ConfigureAwait(false);
             if (userInfos.Success)
             {
                 return Ok(userInfos.Data);
@@ -56,13 +56,13 @@ namespace ECommerceAppAPI.Controllers
             {
                 return Unauthorized("Kullanıcı bulunamadı.");
             }
-            var user = await _authManager.ValidateRefreshTokenAsync(refreshToken);
+            var user = await _authManager.ValidateRefreshTokenAsync(refreshToken).ConfigureAwait(false);
             if (!user.Success)
             {
                 return Unauthorized(new { Message = user.Message });
             }
 
-            var result = await _accountManager.GetUsersAdressesAsync(user.Data);
+            var result = await _accountManager.GetUsersAdressesAsync(user.Data).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<AddressDto> errorDataResult)
@@ -87,13 +87,13 @@ namespace ECommerceAppAPI.Controllers
             {
                 return Unauthorized("Kullanıcı bulunamadı.");
             }
-            var user = await _authManager.ValidateRefreshTokenAsync(refreshToken);
+            var user = await _authManager.ValidateRefreshTokenAsync(refreshToken).ConfigureAwait(false);
             if (!user.Success)
             {
                 return Unauthorized(new { Message = user.Message });
             }
 
-            var result = await _accountManager.CreateAddressAsync(addressDto, user.Data);
+            var result = await _accountManager.CreateAddressAsync(addressDto, user.Data).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorResult errorResult)
@@ -104,7 +104,7 @@ namespace ECommerceAppAPI.Controllers
                     }
                 }
             }
-            return Ok(new { Message = result.Message });
+            return Ok();
         }
 
         [HttpPut("updateuser")]
@@ -117,7 +117,7 @@ namespace ECommerceAppAPI.Controllers
             {
                 return Unauthorized("Kullanıcı bulunamadı.");
             }
-            var user = await _authManager.ValidateRefreshTokenAsync(refreshToken);
+            var user = await _authManager.ValidateRefreshTokenAsync(refreshToken).ConfigureAwait(false);
             if (!user.Success)
             {
                 return Unauthorized(new { Message = user.Message });
@@ -128,7 +128,7 @@ namespace ECommerceAppAPI.Controllers
                 return Unauthorized(new { Message = "Kullanıcı bilgileri uyuşmuyor. Lütfen oturumunuzu kontrol edin." });
             }
 
-            var result = await _accountManager.UpdateUserAsync(user.Data, userDto);
+            var result = await _accountManager.UpdateUserAsync(user.Data, userDto).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorResult errorResult)
@@ -143,7 +143,39 @@ namespace ECommerceAppAPI.Controllers
                     }
                 }
             }
-            return Ok(new { Message =  result.Message });
+            return Ok();
+        }
+
+        [HttpDelete("deleteaddress")]
+        public async Task<IActionResult> DeleteAddress(AddressDto addressDto)
+        {
+            HttpContext.Request.Cookies.TryGetValue("AccessToken", out var accessToken);
+            HttpContext.Request.Cookies.TryGetValue("RefreshToken", out var refreshToken);
+            if (accessToken == null && refreshToken == null)
+            {
+                return Unauthorized("Kullanıcı bulunamadı.");
+            }
+            var user = await _authManager.ValidateRefreshTokenAsync(refreshToken).ConfigureAwait(false);
+            if (!user.Success)
+            {
+                return Unauthorized(new { Message = user.Message });
+            }
+            var result = await _accountManager.DeleteAddressAsync(addressDto).ConfigureAwait(false);
+            if (!result.Success)
+            {
+                if (result is ErrorResult errorResult)
+                {
+                    if (errorResult.ErrorType == "SystemError")
+                    {
+                        return StatusCode(500, errorResult.Message);
+                    }
+                    else if(errorResult.ErrorType == "NotFound")
+                    {
+                        return NotFound(new { Message = errorResult.Message });
+                    }
+                }
+            }
+            return Ok();
         }
     }
 }

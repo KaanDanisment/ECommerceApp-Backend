@@ -23,13 +23,13 @@ namespace Business.Concrete
 
         public async Task<IDataResult<SubcategoryCreateDto>> AddSubcategoryAsync(SubcategoryCreateDto subcategoryCreateDto)
         {
-            Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Name == subcategoryCreateDto.Name);
+            Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Name == subcategoryCreateDto.Name).ConfigureAwait(false);
             if (subcategory != null)
             {
                 return new ErrorDataResult<SubcategoryCreateDto>("This subcategory added before");
             }
-            Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == subcategoryCreateDto.CategoryId);
-            if(category == null)
+            Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == subcategoryCreateDto.CategoryId).ConfigureAwait(false);
+            if (category == null)
             {
                 return new ErrorDataResult<SubcategoryCreateDto>("Wrong category selection");
             }
@@ -40,18 +40,18 @@ namespace Business.Concrete
                 CategoryId = subcategoryCreateDto.CategoryId,
                 ImageUrl = subcategoryCreateDto.ImageUrl,
             };
-            await _unitOfWork.Subcategories.AddAsync(newSubcategory);
-            await _unitOfWork.SaveChangesAsync();
-            return new SuccessDataResult<SubcategoryCreateDto>(subcategoryCreateDto,"Subcategory added successfuly");
+            await _unitOfWork.Subcategories.AddAsync(newSubcategory).ConfigureAwait(false);
+            await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
+            return new SuccessDataResult<SubcategoryCreateDto>(subcategoryCreateDto, "Subcategory added successfuly");
         }
 
         public async Task<IResult> DeleteSubcategoryAsync(int id)
         {
-            Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Id == id);
+            Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Id == id).ConfigureAwait(false);
             if (subcategory != null)
             {
-                await _unitOfWork.Subcategories.DeleteAsync(subcategory);
-                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.Subcategories.DeleteAsync(subcategory).ConfigureAwait(false);
+                await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
 
                 return new SuccessResult("Subcategory deleted successfuly");
             }
@@ -62,10 +62,10 @@ namespace Business.Concrete
         {
             try
             {
-                IEnumerable<Subcategory> subcategories = await _unitOfWork.Subcategories.GetAllAsync();
+                IEnumerable<Subcategory> subcategories = await _unitOfWork.Subcategories.GetAllAsync().ConfigureAwait(false);
                 if (subcategories == null || !subcategories.Any())
                 {
-                    return new ErrorDataResult<IEnumerable<SubcategoryDto>>([], "Alt kategori bulunamadı!");
+                    return new ErrorDataResult<IEnumerable<SubcategoryDto>>(Array.Empty<SubcategoryDto>(), "Alt kategori bulunamadı!");
                 }
                 IEnumerable<SubcategoryDto> subcategoryDtos = subcategories.Select(s => new SubcategoryDto()
                 {
@@ -85,22 +85,22 @@ namespace Business.Concrete
                 };
                 return new ErrorDataResult<IEnumerable<SubcategoryDto>>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
             }
-            
+
         }
 
         public async Task<IDataResult<IEnumerable<SubcategoryDto>>> GetAllSubcategoriesByCategoryIdAsync(int categoryId)
         {
             try
             {
-                Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == categoryId);
+                Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == categoryId).ConfigureAwait(false);
                 if (category == null)
                 {
                     return new ErrorDataResult<IEnumerable<SubcategoryDto>>("Aradığınız kategori bulunamadı!", "NotFound");
                 }
-                IEnumerable<Subcategory> subcategories = await _unitOfWork.Subcategories.GetSubcategoriesByCategoryId(categoryId);
+                IEnumerable<Subcategory> subcategories = await _unitOfWork.Subcategories.GetSubcategoriesByCategoryId(categoryId).ConfigureAwait(false);
                 if (subcategories == null)
                 {
-                    return new ErrorDataResult<IEnumerable<SubcategoryDto>>([], "Alt kategori bulunamdı!");
+                    return new ErrorDataResult<IEnumerable<SubcategoryDto>>(Array.Empty<SubcategoryDto>(), "Alt kategori bulunamdı!");
                 }
                 IEnumerable<SubcategoryDto> subcategoryDtos = subcategories.Select(s => new SubcategoryDto()
                 {
@@ -110,7 +110,7 @@ namespace Business.Concrete
                 });
                 return new SuccessDataResult<IEnumerable<SubcategoryDto>>(subcategoryDtos);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 var errorDetails = new
                 {
@@ -119,14 +119,14 @@ namespace Business.Concrete
                 };
                 return new ErrorDataResult<IEnumerable<SubcategoryDto>>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
             }
-            
+
         }
 
         public async Task<IDataResult<SubcategoryDto>> GetSubcategoryByIdAsync(int subcategoryId)
         {
             try
             {
-                Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Id == subcategoryId);
+                Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Id == subcategoryId).ConfigureAwait(false);
                 if (subcategory == null)
                 {
                     return new ErrorDataResult<SubcategoryDto>("Aradığınız alt kategori bulunamadı!", "NotFound");
@@ -141,7 +141,7 @@ namespace Business.Concrete
 
                 return new SuccessDataResult<SubcategoryDto>(subcategoryDto);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 var errorDetails = new
                 {
@@ -150,20 +150,20 @@ namespace Business.Concrete
                 };
                 return new ErrorDataResult<SubcategoryDto>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
             }
-            
+
         }
 
         public async Task<IResult> UpdateSubcategoryAsync(SubcategoryUpdateDto subcategoryUpdateDto)
         {
-            Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Id == subcategoryUpdateDto.Id);
-            if(subcategory != null)
+            Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Id == subcategoryUpdateDto.Id).ConfigureAwait(false);
+            if (subcategory != null)
             {
                 subcategory.Name = subcategoryUpdateDto.Name;
                 subcategory.CategoryId = subcategoryUpdateDto.CategoryId;
                 subcategory.ImageUrl = subcategoryUpdateDto.ImageUrl;
 
-                await _unitOfWork.Subcategories.UpdateAsync(subcategory);
-                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.Subcategories.UpdateAsync(subcategory).ConfigureAwait(false);
+                await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
                 return new SuccessResult("Subcategory updated succesfuly");
             }
             return new ErrorResult("SubCategory was not found");

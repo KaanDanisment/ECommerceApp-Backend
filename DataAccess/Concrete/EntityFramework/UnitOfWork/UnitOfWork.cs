@@ -44,12 +44,12 @@ namespace DataAccess.Concrete.EntityFramework.UnitOfWork
 
         public async Task<int> SaveChangesAsync()
         {
-            return await _context.SaveChangesAsync();
+            return await _context.SaveChangesAsync().ConfigureAwait(false);
         }
 
         public async Task<IDbContextTransaction> BeginTransactionAsync()
         {
-            return await _context.Database.BeginTransactionAsync();
+            return await _context.Database.BeginTransactionAsync().ConfigureAwait(false);
         }
     }
 }

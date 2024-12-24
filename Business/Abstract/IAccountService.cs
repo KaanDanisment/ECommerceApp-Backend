@@ -15,5 +15,6 @@ namespace Business.Abstract
         Task<IResult> CreateAddressAsync(AddressDto addressDto,User user);
         Task<IDataResult<IEnumerable<AddressDto>>> GetUsersAdressesAsync(User user);
         Task<IResult> UpdateUserAsync(User user,UserDto userDto);
+        Task<IResult> DeleteAddressAsync(AddressDto addressDto);
     }
 }
