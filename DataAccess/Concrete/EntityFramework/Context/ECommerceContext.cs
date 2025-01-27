@@ -49,6 +49,14 @@ namespace DataAccess.Concrete.EntityFramework.Context
                 .HasForeignKey(s => s.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            builder.Entity<Subcategory>()
+                .HasIndex(i => i.Name)
+                .IsUnique();
+
+            builder.Entity<Category>()
+                .HasIndex(i => i.Name)
+                .IsUnique();
+
             builder.Entity<Image>()
                 .HasOne(i => i.Product)
                 .WithMany(p => p.Images)
@@ -58,10 +66,6 @@ namespace DataAccess.Concrete.EntityFramework.Context
             builder.Entity<Image>()
                 .Property(i => i.FileUrl)
                 .IsRequired();
-
-            builder.Entity<Image>()
-                .HasIndex(i => i.FileUrl)
-                .IsUnique();
 
             builder.Entity<Order>()
                 .Property(o => o.Status)

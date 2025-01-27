@@ -1,5 +1,6 @@
 ﻿using Core.Utilities.Results.Abstract;
 using Entities;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,8 +11,8 @@ namespace Business.Abstract
 {
     public interface IImageService
     {
-        Task<IDataResult<IEnumerable<Image>>> AddASync(List<Image> images, int productId);
+        Task<Core.Utilities.Results.Abstract.IResult> AddAsync(List<IFormFile> images, int productId);
         Task<IDataResult<Image>> UpdateAsync(Image image);
-        Task<IResult> DeleteAsync(int id);
+        Task<Core.Utilities.Results.Abstract.IResult> DeleteAsync(int id);
     }
 }

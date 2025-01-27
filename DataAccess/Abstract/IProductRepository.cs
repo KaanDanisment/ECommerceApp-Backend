@@ -10,9 +10,8 @@ namespace Core.DataAccess
 {
     public interface IProductRepository : IGenericRepository<Product>
     {
-        Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(int categoryId);
-        Task<IEnumerable<Product>> GetProductsBySubcategoryIdAsync(int subcategoryId);
+        Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(int categoryId, string? orderBy = null);
+        Task<IEnumerable<Product>> GetProductsBySubcategoryIdAsync(int subcategoryId, string? orderBy = null);
         Task<IEnumerable<Product>> GetLatestProducts();
-        Task<IEnumerable<Product>> GetBestSellerProducts();
     }
 }

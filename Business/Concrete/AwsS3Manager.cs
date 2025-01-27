@@ -14,12 +14,12 @@ using System.Threading.Tasks;
 
 namespace Business.Concrete
 {
-    public class IAwsS3Manager : IAwsS3Service
+    public class AwsS3Manager : IAwsS3Service
     {
         private readonly IAmazonS3 _s3Client;
         private readonly string _bucketName;
 
-        public IAwsS3Manager(IConfiguration configuration)
+        public AwsS3Manager(IConfiguration configuration)
         {
             var awsOptions = configuration.GetSection("AWS");
             _bucketName = awsOptions["BucketName"];
@@ -39,8 +39,48 @@ namespace Business.Concrete
             );
         }
 
+        private async Task<IDataResult<string>> CheckFileExistsAsync(IFormFile file)
+        {
+            try
+            {
+                var metadata = await _s3Client.GetObjectMetadataAsync(_bucketName, file.FileName);
+                string cloudFrontDomain = "d2i5wjqbrdd2cq.cloudfront.net";
+                string url = $"https://{cloudFrontDomain}/{file.FileName}";
+                return new SuccessDataResult<string>(url, "File uploaded successfully");
+            }
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return new ErrorDataResult<string>();
+            }
+            catch (AmazonS3Exception s3Ex)
+            {
+                var errorDetails = new
+                {
+                    Message = s3Ex.Message,
+                    ErrorCode = s3Ex.ErrorCode,
+                    RequestId = s3Ex.RequestId,
+                    StatusCode = s3Ex.StatusCode
+                };
+                return new ErrorDataResult<string>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorDataResult<string>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+        }
+
         public async Task<IDataResult<string>> UploadFileAsync(IFormFile file)
         {
+            var checkFileExists = await CheckFileExistsAsync(file);
+            if (checkFileExists.Success)
+            {
+                return new SuccessDataResult<string>(checkFileExists.Data,"File url exist");
+            }
             try
             {
                 using (var stream = file.OpenReadStream())
@@ -88,12 +128,11 @@ namespace Business.Concrete
                 var deleteObjectRequest = new DeleteObjectRequest
                 {
                     BucketName = _bucketName,
-                    Key = key // Silmek istediğiniz dosyanın adı
+                    Key = key
                 };
 
                 var response = await _s3Client.DeleteObjectAsync(deleteObjectRequest);
 
-                // HTTP 204 No Content başarılı silme işlemini ifade eder
                 return new SuccessResult("Dosya S3 Buckettan silindi");
             }
             catch (AmazonS3Exception s3Ex)

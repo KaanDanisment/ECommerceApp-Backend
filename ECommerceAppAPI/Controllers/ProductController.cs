@@ -17,9 +17,9 @@ namespace ECommerceAppAPI.Controllers
         }
 
         [HttpGet("getall")]
-        public async Task<IActionResult> GetlAll()
+        public async Task<IActionResult> GetlAll([FromQuery] int? page, [FromQuery] string? sortBy)
         {
-            var result = await _productManager.GetAllAsync().ConfigureAwait(false);
+            var result = await _productManager.GetAllAsync(page,sortBy).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<ProductDto> errorDataResult)
@@ -65,7 +65,7 @@ namespace ECommerceAppAPI.Controllers
                 {
                     if (errorDataResult.ErrorType == "BadRequest")
                     {
-                        return BadRequest(new { Message =  result.Message });
+                        return BadRequest(new { Message = result.Message });
                     }
                     else if (errorDataResult.ErrorType == "SystemError")
                     {
@@ -77,38 +77,66 @@ namespace ECommerceAppAPI.Controllers
         }
 
         [HttpPut]
-        public async Task<IActionResult> Update(ProductUpdateDto productUpdateDto)
+        public async Task<IActionResult> Update([FromForm] ProductUpdateDto productUpdateDto)
         {
             var result = await _productManager.UpdateAsync(productUpdateDto).ConfigureAwait(false);
-            if (result.Success)
+            if (!result.Success)
             {
-                return Ok(result);
+                if(result is ErrorResult errorResult)
+                {
+                    if (errorResult.ErrorType == "NotFound")
+                    {
+                        return NotFound(new { Message = result.Message });
+                    }
+                    else if (errorResult.ErrorType == "SystemError")
+                    {
+                        return StatusCode(500, errorResult.Message);
+                    }
+                    else if (errorResult.ErrorType == "BadRequest")
+                    {
+                        return BadRequest(new { Message = result.Message });
+                    }
+                }
             }
-            return BadRequest(result);
+            return Ok();
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             var result = await _productManager.DeleteAsync(id).ConfigureAwait(false);
-            if (result.Success)
+            if (!result.Success)
             {
-                return Ok(result);
+                if (result is ErrorResult errorResult)
+                {
+                    if (errorResult.ErrorType == "NotFound")
+                    {
+                        return NotFound(new { Message = result.Message });
+                    }
+                    else if (errorResult.ErrorType == "SystemError")
+                    {
+                        return StatusCode(500, errorResult.Message);
+                    }
+                    else if (errorResult.ErrorType == "BadRequest")
+                    {
+                        return BadRequest(new { Message = result.Message });
+                    }
+                }
             }
-            return BadRequest(result);
+            return Ok();
         }
 
         [HttpGet("getbycategoryid/{categoryId}")]
-        public async Task<IActionResult> GetProductsByCategoryId(int categoryId)
+        public async Task<IActionResult> GetProductsByCategoryId(int categoryId, [FromQuery] string? sortBy)
         {
-            var result = await _productManager.GetProductsByCategoryId(categoryId).ConfigureAwait(false);
+            var result = await _productManager.GetProductsByCategoryId(categoryId,sortBy).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<IEnumerable<ProductDto>> errorDataResult)
                 {
                     if (errorDataResult.ErrorType == "NotFound")
                     {
-                        return NotFound(new { result.Message });
+                        return NotFound(new { Message = result.Message });
                     }
                     else if (errorDataResult.ErrorType == "SystemError")
                     {
@@ -121,9 +149,9 @@ namespace ECommerceAppAPI.Controllers
         }
 
         [HttpGet("getbysubcategoryid/{subcategoryId}")]
-        public async Task<IActionResult> GetProductsBySubcategoryId(int subcategoryId)
+        public async Task<IActionResult> GetProductsBySubcategoryId(int subcategoryId, [FromQuery] string? sortBy)
         {
-            var result = await _productManager.GetProductsBySubcategoryId(subcategoryId).ConfigureAwait(false);
+            var result = await _productManager.GetProductsBySubcategoryId(subcategoryId,sortBy).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<IEnumerable<ProductDto>> errorDataResult)

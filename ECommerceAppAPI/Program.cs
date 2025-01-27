@@ -42,12 +42,4 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(Directory.GetCurrentDirectory(), "StaticFiles")),
-    RequestPath = "/static"
-});
-
-
 app.Run();

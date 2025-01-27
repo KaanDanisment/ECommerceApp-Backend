@@ -63,7 +63,7 @@ namespace ECommerceAppAPI.Extensions
             services.AddScoped<IAccountService, AccountManager>();
             services.AddScoped<RefreshTokenHelper, RefreshTokenHelper>();
             services.AddScoped<IAdminService, AdminManager>();
-            services.AddScoped<IAwsS3Service, IAwsS3Manager>();
+            services.AddScoped<IAwsS3Service, AwsS3Manager>();
 
 
             //Authentication

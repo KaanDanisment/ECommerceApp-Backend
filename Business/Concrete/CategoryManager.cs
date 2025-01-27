@@ -54,7 +54,7 @@ namespace Business.Concrete
         {
             try
             {
-                IEnumerable<Category> categories = await _unitOfWork.Categories.GetAllAsync().ConfigureAwait(false);
+                IEnumerable<Category> categories = (await _unitOfWork.Categories.GetAllAsync().ConfigureAwait(false)).OrderBy(c => c.Id);
                 if (categories == null || !categories.Any())
                 {
                     return new ErrorDataResult<IEnumerable<CategoryDto>>(Array.Empty<CategoryDto>(), "Kategori bulunamdı!");

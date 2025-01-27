@@ -1,6 +1,7 @@
 ﻿using Core.DataAccess.Abstract;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,16 +32,35 @@ namespace DataAccess.Core.Concrete.EntityFramework
             _context.Set<TEntity>().Remove(entity);
         }
 
-        public async Task<IEnumerable<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>> filter = null)
+        public async Task<IEnumerable<TEntity>> GetAllAsync(
+            Expression<Func<TEntity, bool>>? filter = null,
+            Func<IQueryable<TEntity>,IIncludableQueryable<TEntity,object>>? include = null,
+            Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>? orderBy = null)
         {
-            return filter == null
-                ? await _context.Set<TEntity>().ToListAsync().ConfigureAwait(false)
-                : await _context.Set<TEntity>().Where(filter).ToListAsync().ConfigureAwait(false);
+            IQueryable<TEntity> query = _context.Set<TEntity>();
+            if(filter != null)
+            {
+                query = query.Where(filter);
+            }
+            if (include != null)
+            {
+                query = include(query);
+            }
+            if (orderBy != null)
+            {
+                query = orderBy(query);
+            }
+            return await query.ToListAsync().ConfigureAwait(false);
         }
 
-        public async Task<TEntity?> GetAsync(Expression<Func<TEntity, bool>> filter)
+        public async Task<TEntity?> GetAsync(Expression<Func<TEntity, bool>> filter, Func<IQueryable<TEntity>, IIncludableQueryable<TEntity, object>>? include = null)
         {
-            return await _context.Set<TEntity>().SingleOrDefaultAsync(filter).ConfigureAwait(false);
+            IQueryable<TEntity> query = _context.Set<TEntity>().Where(filter);
+            if (include != null)
+            {
+                query = include(query);
+            }
+            return await query.FirstOrDefaultAsync();
         }
 
         public async Task UpdateAsync(TEntity entity)

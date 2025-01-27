@@ -74,7 +74,7 @@ namespace Business.Concrete
                     {
                         return new ErrorResult("Kategori bulunamadı", "BadRequest");
                     }
-                    else if (sqlEx.Number == 2627)
+                    else if (sqlEx.Number == 2601)
                     {
                         return new ErrorResult("Aynı isme sahip alt kategori mevcut.", "BadRequest");
                     }
@@ -100,25 +100,26 @@ namespace Business.Concrete
 
         public async Task<IResult> DeleteSubcategoryAsync(int id)
         {
-            Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Id == id).ConfigureAwait(false);
-            if (subcategory == null)
-            {
-                return new ErrorResult("Alt kategori bulunamadı", "NotFound");
-            }
-
-            if (subcategory.Products != null && subcategory.Products.Count != 0)
-            {
-                foreach (var product in subcategory.Products)
-                {
-                    if (product.OrderProducts.Count != 0)
-                    {
-                        return new ErrorResult("Bu kategorideki ürünlerin daha tamamlanmamış siparişleri var. Kategoriyi silebilmek için siparişlerin tamalanmasını bekleyin", "BadRequest");
-                    }
-                }
-            }
 
             try
             {
+                Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Id == id).ConfigureAwait(false);
+                if (subcategory == null)
+                {
+                    return new ErrorResult("Alt kategori bulunamadı", "NotFound");
+                }
+
+                if (subcategory.Products != null && subcategory.Products.Count != 0)
+                {
+                    foreach (var product in subcategory.Products)
+                    {
+                        if (product.OrderProducts.Count != 0)
+                        {
+                            return new ErrorResult("Bu kategorideki ürünlerin daha tamamlanmamış siparişleri var. Kategoriyi silebilmek için siparişlerin tamalanmasını bekleyin", "BadRequest");
+                        }
+                    }
+                }
+
                 if (subcategory.ImageUrl != null)
                 {
                     var key = subcategory.ImageUrl.Substring(subcategory.ImageUrl.LastIndexOf('/') + 1);
@@ -158,7 +159,7 @@ namespace Business.Concrete
                     Id = s.Id,
                     Name = s.Name,
                     CategoryId = s.CategoryId,
-                    ImageUrl = s.ImageUrl                    
+                    ImageUrl = s.ImageUrl
                 });
                 return new SuccessDataResult<IEnumerable<SubcategoryDto>>(subcategoryDtos);
             }
@@ -270,6 +271,7 @@ namespace Business.Concrete
                     var fileUrl = await _awsS3Manager.UploadFileAsync(subcategoryCreateDto.Image);
                     if (!fileUrl.Success)
                     {
+                        await transaction.RollbackAsync().ConfigureAwait(false);
                         return new ErrorResult(fileUrl.Message, "SystemError");
                     }
                     subcategory.ImageUrl = fileUrl.Data;
@@ -280,11 +282,11 @@ namespace Business.Concrete
                     var result = await _awsS3Manager.DeleteFileAsync(key);
                     if (!result.Success)
                     {
+                        await transaction.RollbackAsync().ConfigureAwait(false);
                         return new ErrorResult(result.Message, "SystemError");
                     }
                     subcategory.ImageUrl = null;
                 }
-
 
                 await _unitOfWork.Subcategories.UpdateAsync(subcategory).ConfigureAwait(false);
                 await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
@@ -301,7 +303,7 @@ namespace Business.Concrete
                     {
                         return new ErrorResult("Kategori bulunamadı", "BadRequest");
                     }
-                    else if (sqlEx.Number == 2627)
+                    else if (sqlEx.Number == 2601)
                     {
                         return new ErrorResult("Aynı isme sahip alt kategori mevcut.", "BadRequest");
                     }

@@ -17,10 +17,15 @@ namespace Entities.Validators
                 .MinimumLength(3).WithMessage("İsim en az 3 karakter olmalıdır.")
                 .MaximumLength(50).WithMessage("En fazla 50 karakter olabilir.");
 
+            
+            RuleFor(x => x.Color).Cascade(CascadeMode.Stop)
+                .NotEmpty().WithMessage("Renk alanı boş geçilemez.")
+                .Matches("^[a-zA-ZçÇğĞıİöÖşŞüÜ]*$").WithMessage("Renk sadece harf içerebilir.");
+
             RuleFor(x => x.Description).Cascade(CascadeMode.Stop)
                 .NotEmpty().WithMessage("Açıklama alanı boş geçilemez.")
                 .MinimumLength(3).WithMessage("Açıklama en az 3 karakter olmalıdır.")
-                .MaximumLength(50).WithMessage("Açıklama en fazla 50 karakter olabilir.");
+                .MaximumLength(100).WithMessage("Açıklama en fazla 100 karakter olabilir.");
 
             RuleFor(x => x.Price).Cascade(CascadeMode.Stop)
                 .NotEmpty().WithMessage("Fiyat alanı boş geçilemez.")

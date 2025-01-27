@@ -1,4 +1,5 @@
 ﻿using Business.Abstract;
+using Core.Utilities.Pagination;
 using Core.Utilities.Results.Abstract;
 using Core.Utilities.Results.Concrete;
 using DataAccess.Abstract;
@@ -20,33 +21,35 @@ namespace Business.Concrete
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IAwsS3Service _awsS3Manager;
+        private readonly IImageService _imageManager;
 
         public ProductManager(IUnitOfWork unitOfWork, IImageService imageManager, IAwsS3Service awsS3Manager)
         {
             _unitOfWork = unitOfWork;
             _awsS3Manager = awsS3Manager;
+            _imageManager = imageManager;
         }
 
         public async Task<IDataResult<ProductCreateDto>> AddAsync(ProductCreateDto productCreateDto)
         {
             var validator = new ProductCreateDtoValidator();
-            var validationResults = await validator.ValidateAsync(productCreateDto).ConfigureAwait(false);
+            var validationResults = await validator.ValidateAsync(productCreateDto);
 
             if (!validationResults.IsValid)
             {
                 var errorMessage = validationResults.Errors.Select(e => e.ErrorMessage).FirstOrDefault();
                 if (errorMessage != null)
                 {
-                    return new ErrorDataResult<ProductCreateDto>(errorMessage,"BadRequest");
+                    return new ErrorDataResult<ProductCreateDto>(errorMessage, "BadRequest");
                 }
             }
 
-            if(productCreateDto.Images == null || !productCreateDto.Images.Any())
+            if (productCreateDto.Images == null || !productCreateDto.Images.Any())
             {
                 return new ErrorDataResult<ProductCreateDto>("En az bir ürün resmi ekleyin.", "BadRequest");
             }
 
-            using var transaction = await _unitOfWork.BeginTransactionAsync().ConfigureAwait(false);
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
 
             try
             {
@@ -62,41 +65,21 @@ namespace Business.Concrete
                     CategoryId = productCreateDto.CategoryId,
                     SubcategoryId = productCreateDto.SubcategoryId,
                 };
-                await _unitOfWork.Products.AddAsync(product).ConfigureAwait(false);
+                await _unitOfWork.Products.AddAsync(product);
+                await _unitOfWork.SaveChangesAsync();
 
-                List<Image> images = new List<Image>();
-                foreach (var image in productCreateDto.Images)
+                var result = await _imageManager.AddAsync(productCreateDto.Images, product.Id);
+                if (!result.Success)
                 {
-                    var fileUrl = await _awsS3Manager.UploadFileAsync(image).ConfigureAwait(false);
-                    if (!fileUrl.Success)
-                    {
-                        await transaction.RollbackAsync().ConfigureAwait(false);
-                        return new ErrorDataResult<ProductCreateDto>(fileUrl.Message, "SystemError");
-                    }
-                    images.Add(new Image()
-                    {
-                        FileUrl = fileUrl.Data,
-                        Product = product
-                    });
+                    return new ErrorDataResult<ProductCreateDto>(result.Message, "SystemError");
                 }
 
-                await _unitOfWork.Images.AddRangeAsync(images).ConfigureAwait(false);
-                await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
-
-                await transaction.CommitAsync().ConfigureAwait(false);
+                await transaction.CommitAsync();
                 return new SuccessDataResult<ProductCreateDto>(productCreateDto);
             }
             catch (DbUpdateException dbEx)
             {
-                await transaction.RollbackAsync().ConfigureAwait(false);
-
-                if (dbEx.InnerException is SqlException sqlEx)
-                {
-                    if (sqlEx.Number == 2627)
-                    {
-                        return new ErrorDataResult<ProductCreateDto>(productCreateDto, "Aynı isme sahip bir ürün zaten mevcut.", "BadRequest");
-                    }
-                }
+                await transaction.RollbackAsync();
                 var errorDetails = new
                 {
                     Message = dbEx.Message,
@@ -106,7 +89,7 @@ namespace Business.Concrete
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync().ConfigureAwait(false);
+                await transaction.RollbackAsync();
                 var errorDetails = new
                 {
                     Message = ex.Message,
@@ -115,55 +98,169 @@ namespace Business.Concrete
                 return new ErrorDataResult<ProductCreateDto>(productCreateDto, System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
             }
         }
-
-        public async Task<IResult> DeleteAsync(int id)
+        public async Task<IResult> UpdateAsync(ProductUpdateDto productUpdateDto)
         {
-            Product product = await _unitOfWork.Products.GetAsync(p => p.Id == id).ConfigureAwait(false);
-            if (product != null)
+            Product product = await _unitOfWork.Products.GetAsync(p => p.Id == productUpdateDto.Id);
+            if (product == null)
             {
-                Order order = await _unitOfWork.Orders.GetAsync(o => o.OrderProducts.Any(op => op.ProductId == product.Id)).ConfigureAwait(false);
-                if (order != null && order.Status != "delivered")
-                {
-                    return new ErrorResult("Ürünü silebilmek için tüm siparişlerin tamamlanmasını bekleyin.");
-                }
-                await _unitOfWork.Products.DeleteAsync(product).ConfigureAwait(false);
-                await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
-                return new SuccessResult("Ürün başarıyla silindi!");
+                return new ErrorResult("Ürün bulunamadı!", "NotFound");
             }
-            return new ErrorResult("Ürün bulunamadı!");
-        }
 
-        public async Task<IDataResult<IEnumerable<ProductDto>>> GetAllAsync()
+            var validator = new ProductUpdateDtoValidator();
+            var validationResults = await validator.ValidateAsync(productUpdateDto);
+
+            if (!validationResults.IsValid)
+            {
+                var errorMessage = validationResults.Errors.Select(e => e.ErrorMessage).FirstOrDefault();
+                if (errorMessage != null)
+                {
+                    return new ErrorResult(errorMessage, "BadRequest");
+                }
+            }
+
+            if (productUpdateDto.Images == null || !productUpdateDto.Images.Any())
+            {
+                return new ErrorResult("En az bir ürün resmi ekleyin.", "BadRequest");
+            }
+
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                product.Name = productUpdateDto.Name;
+                product.Color = productUpdateDto.Color;
+                product.Size = productUpdateDto.Size;
+                product.Description = productUpdateDto.Description;
+                product.Price = productUpdateDto.Price;
+                product.Stock = productUpdateDto.Stock;
+
+                Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == productUpdateDto.CategoryId);
+                if (category == null)
+                {
+                    return new ErrorResult("Geçersiz kategori", "BadRequest");
+                }
+                product.CategoryId = productUpdateDto.CategoryId;
+
+                Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Id == productUpdateDto.SubcategoryId);
+                if (subcategory == null)
+                {
+                    return new ErrorResult("Geçersiz alt kategori", "BadRequest");
+                }
+                product.SubcategoryId = productUpdateDto.SubcategoryId;
+
+                if (productUpdateDto.Images[0].Length > 0)
+                {
+                    var existingImages = await _unitOfWork.Images.GetImagesByProductIdAsync(product.Id);
+
+                    // Ürünün mevcut resimlerini aws bucketten sil
+                    foreach (var image in existingImages)
+                    {
+                        var key = image.FileUrl.Substring(image.FileUrl.LastIndexOf('/') + 1);
+                        var result = await _awsS3Manager.DeleteFileAsync(key);
+                        if (!result.Success)
+                        {
+                            return new ErrorResult(result.Message, "SystemError");
+                        }
+                    }
+
+                    // Eğer mevcut resim sayısı, güncellenecek resim sayısından fazla ise, fazla olan resimleri sil
+                    if (existingImages.Count() > productUpdateDto.Images.Count)
+                    {
+                        var imagesToDelete = existingImages.Skip(productUpdateDto.Images.Count).ToList();
+                        foreach (var image in imagesToDelete)
+                        {
+                            await _unitOfWork.Images.DeleteAsync(image);
+                        }
+                    }
+
+                    int index = 0;
+                    foreach (var image in productUpdateDto.Images)
+                    {
+                        var fileUrl = await _awsS3Manager.UploadFileAsync(image);
+                        if (!fileUrl.Success)
+                        {
+                            await transaction.RollbackAsync();
+                            return new ErrorResult(fileUrl.Message, "SystemError");
+                        }
+
+                        if (index < existingImages.Count())
+                        {
+                            var existingImage = existingImages.ElementAt(index);
+                            existingImage.FileUrl = fileUrl.Data;
+                            await _unitOfWork.Images.UpdateAsync(existingImage);
+                        }
+                        else
+                        {
+                            var newImage = new Image()
+                            {
+                                FileUrl = fileUrl.Data,
+                                Product = product
+                            };
+                            await _unitOfWork.Images.AddAsync(newImage);
+                        }
+                        index++;
+                    }
+                }
+
+
+
+                await _unitOfWork.Products.UpdateAsync(product);
+                await _unitOfWork.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return new SuccessResult("Ürün başarıyla güncellendi!");
+            }
+            catch (DbUpdateException dbEx)
+            {
+                await transaction.RollbackAsync();
+                var errorDetails = new
+                {
+                    Message = dbEx.Message,
+                    InnerException = dbEx.InnerException?.Message
+                };
+                return new ErrorResult(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorResult(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+        }
+        public async Task<IResult> DeleteAsync(int id)
         {
             try
             {
-                IEnumerable<Product> products = await _unitOfWork.Products.GetAllAsync().ConfigureAwait(false);
-                if (products == null || !products.Any())
+                Product product = await _unitOfWork.Products.GetAsync(p => p.Id == id, include: p => p.Include(p => p.Images));
+                if (product != null)
                 {
-                    return new ErrorDataResult<IEnumerable<ProductDto>>(Array.Empty<ProductDto>(), "Ürün listesi boş.");
-                }
+                    if (product.OrderProducts != null && product.OrderProducts.Any())
+                    {
+                        var orderIds = product.OrderProducts.Select(op => op.OrderId).ToList();
+                        if (orderIds.Any())
+                        {
+                            List<Order> orders = (await _unitOfWork.Orders.GetAllAsync(o => orderIds.Contains(o.Id))).ToList();
+                            if (orders != null && orders.Any(o => o.Status != "delivered"))
+                            {
+                                return new ErrorResult("Ürünü silebilmek için tüm siparişlerin tamamlanmasını bekleyin.", "BadRequest");
+                            }
+                        }
+                    }
 
-                List<ProductDto> productDtos = products.Select(p => new ProductDto()
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Color = p.Color,
-                    Size = p.Size,
-                    Description = p.Description,
-                    Price = p.Price,
-                    Stock = p.Stock,
-                    CategoryId = p.CategoryId,
-                    SubcategoryId = p.SubcategoryId,
-                    CreatedAt = p.CreatedAt
-                }).ToList();
+                    foreach (var image in product.Images)
+                    {
+                        var key = image.FileUrl.Split("/").Last();
+                        await _awsS3Manager.DeleteFileAsync(key);
+                    }
 
-                IEnumerable<Image> allImages = await _unitOfWork.Images.GetAllAsync().ConfigureAwait(false);
-                foreach (ProductDto productDto in productDtos)
-                {
-                    List<string> imageUrls = allImages.Where(img => img.ProductId == productDto.Id).Select(img => img.FileUrl).ToList();
-                    productDto.ImageUrls = imageUrls;
+                    await _unitOfWork.Products.DeleteAsync(product);
+                    await _unitOfWork.SaveChangesAsync();
+                    return new SuccessResult("Ürün başarıyla silindi!");
                 }
-                return new SuccessDataResult<IEnumerable<ProductDto>>(productDtos);
+                return new ErrorResult("Ürün bulunamadı!", "NotFound");
             }
             catch (Exception ex)
             {
@@ -172,7 +269,163 @@ namespace Business.Concrete
                     Message = ex.Message,
                     InnerException = ex.InnerException?.Message
                 };
-                return new ErrorDataResult<IEnumerable<ProductDto>>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+                return new ErrorResult(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+
+        }
+
+        private async Task<IDataResult<IEnumerable<Product>>> SortProducts(int? page, string sortBy)
+        {
+
+            try
+            {
+                IEnumerable<Product> products;
+
+                int pageSize = 20;
+                int pageNumber = page ?? 0;
+
+                Func<IQueryable<Product>, IOrderedQueryable<Product>> orderBy = null;
+                switch (sortBy)
+                {
+                    case "id_descending":
+                        orderBy = q => q.OrderByDescending(p => p.Id);
+                        break;
+                    case "price_ascending":
+                        orderBy = q => q.OrderBy(p => p.Price);
+                        break;
+                    case "price_descending":
+                        orderBy = q => q.OrderByDescending(p => p.Price);
+                        break;
+                    case "stock_ascending":
+                        orderBy = q => q.OrderBy(p => p.Stock);
+                        break;
+                    case "stock_descending":
+                        orderBy = q => q.OrderByDescending(p => p.Stock);
+                        break;
+                    case "date_ascending":
+                        orderBy = q => q.OrderBy(p => p.CreatedAt);
+                        break;
+                    case "date_descending":
+                        orderBy = q => q.OrderByDescending(p => p.CreatedAt);
+                        break;
+                }
+
+                products = await _unitOfWork.Products.GetAllAsync(
+                    include: p => p.Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory),
+                    orderBy: orderBy
+                ).ConfigureAwait(false);
+
+                if (pageNumber != 0)
+                {
+                    products = products
+                        .Skip((pageNumber - 1) * pageSize)
+                        .Take(pageSize)
+                        .ToList();
+                }
+
+                return new SuccessDataResult<IEnumerable<Product>>(products);
+            }
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorDataResult<IEnumerable<Product>>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+        }
+        public async Task<IDataResult<PaginationResult<ProductDto>>> GetAllAsync(int? page, string? sortBy)
+        {
+
+            try
+            {
+                IEnumerable<Product> products;
+                int totalItemCount = (await _unitOfWork.Products.GetAllAsync().ConfigureAwait(false)).Count();
+                int pageSize = 20;
+                int pageNumber = page ?? 0;
+
+                if (sortBy == null)
+                {
+                    if (page > 0)
+                    {
+                        products = (await _unitOfWork.Products.GetAllAsync(include: p => p.Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)).ConfigureAwait(false))
+                            .Skip((pageNumber - 1) * pageSize)
+                            .Take(pageSize)
+                            .ToList();
+                    }
+                    else
+                    {
+                        pageSize = totalItemCount;
+                        products = await _unitOfWork.Products.GetAllAsync(include: p => p.Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    if (page > 0)
+                    {
+                        var result = await SortProducts(page, sortBy);
+                        if (result.Success)
+                        {
+                            products = result.Data;
+                        }
+                        else
+                        {
+                            return new ErrorDataResult<PaginationResult<ProductDto>>(
+                                new PaginationResult<ProductDto>(Array.Empty<ProductDto>(), totalItemCount, pageNumber, pageSize), "SystemError");
+                        }
+                    }
+                    else
+                    {
+                        var result = await SortProducts(page, sortBy);
+                        if (result.Success)
+                        {
+                            products = result.Data;
+                        }
+                        else
+                        {
+                            return new ErrorDataResult<PaginationResult<ProductDto>>(
+                                new PaginationResult<ProductDto>(Array.Empty<ProductDto>(), totalItemCount, pageNumber, pageSize), "SystemError");
+                        }
+                    }
+                }
+
+
+                if (products == null || !products.Any())
+                {
+                    return new ErrorDataResult<PaginationResult<ProductDto>>(
+                        new PaginationResult<ProductDto>(Array.Empty<ProductDto>(), totalItemCount, pageNumber, pageSize), "Ürün listesi boş.");
+                }
+
+                IEnumerable<ProductDto> productDtos = products.Select(p => new ProductDto()
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Color = p.Color,
+                    Size = p.Size,
+                    Description = p.Description,
+                    Price = p.Price,
+                    Stock = p.Stock,
+                    CategoryName = p.Category.Name,
+                    CategoryId = p.CategoryId,
+                    SubcategoryName = p.Subcategory.Name,
+                    SubcategoryId = p.SubcategoryId,
+                    CreatedAt = p.CreatedAt,
+                    ImageUrls = p.Images.Select(img => img.FileUrl).ToList()
+                }).ToList();
+
+                var paginationResult = new PaginationResult<ProductDto>(productDtos, totalItemCount, pageNumber, pageSize);
+
+                return new SuccessDataResult<PaginationResult<ProductDto>>(paginationResult);
+            }
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorDataResult<PaginationResult<ProductDto>>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
             }
         }
 
@@ -180,23 +433,25 @@ namespace Business.Concrete
         {
             try
             {
-                Product product = await _unitOfWork.Products.GetAsync(p => p.Id == id).ConfigureAwait(false);
+                Product product = await _unitOfWork.Products.GetAsync(filter: p => p.Id == id, include: p => p.Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)).ConfigureAwait(false);
                 if (product != null)
                 {
                     ProductDto productDto = new ProductDto()
                     {
                         Id = product.Id,
                         Name = product.Name,
+                        Color = product.Color,
+                        Size = product.Size,
                         Description = product.Description,
                         Price = product.Price,
                         Stock = product.Stock,
+                        CategoryName = product.Category.Name,
                         CategoryId = product.CategoryId,
-                        SubcategoryId = product.SubcategoryId
+                        SubcategoryName = product.Subcategory.Name,
+                        SubcategoryId = product.SubcategoryId,
+                        CreatedAt = product.CreatedAt,
+                        ImageUrls = product.Images.Select(img => img.FileUrl).ToList()
                     };
-
-                    IEnumerable<Image> images = await _unitOfWork.Images.GetImagesByProductIdAsync(productDto.Id).ConfigureAwait(false);
-                    List<string> imageUrls = images.Select(image => image.FileUrl).ToList();
-                    productDto.ImageUrls = imageUrls;
 
                     return new SuccessDataResult<ProductDto>(productDto);
                 }
@@ -227,9 +482,12 @@ namespace Business.Concrete
                         Description = p.Description,
                         Price = p.Price,
                         Stock = p.Stock,
+                        CategoryName = p.Category.Name,
                         CategoryId = p.CategoryId,
+                        SubcategoryName = p.Subcategory.Name,
                         SubcategoryId = p.SubcategoryId,
-                        CreatedAt = p.CreatedAt
+                        CreatedAt = p.CreatedAt,
+                        ImageUrls = p.Images.Select(img => img.FileUrl).ToList()
                     });
                     return new SuccessDataResult<IEnumerable<ProductDto>>(producDtos);
                 }
@@ -246,7 +504,7 @@ namespace Business.Concrete
             }
         }
 
-        public async Task<IDataResult<IEnumerable<ProductDto>>> GetProductsByCategoryId(int categoryId)
+        public async Task<IDataResult<IEnumerable<ProductDto>>> GetProductsByCategoryId(int categoryId, string orderBy)
         {
             try
             {
@@ -255,7 +513,16 @@ namespace Business.Concrete
                 {
                     return new ErrorDataResult<IEnumerable<ProductDto>>("Aradığınız kategori bulunamadı!", "NotFound");
                 }
-                IEnumerable<Product> products = await _unitOfWork.Products.GetProductsByCategoryIdAsync(categoryId).ConfigureAwait(false);
+                IEnumerable<Product> products;
+                if (orderBy == null)
+                {
+                    products = await _unitOfWork.Products.GetProductsByCategoryIdAsync(categoryId).ConfigureAwait(false);
+                }
+                else
+                {
+                    products = await _unitOfWork.Products.GetProductsByCategoryIdAsync(categoryId, orderBy).ConfigureAwait(false);
+                }
+
                 if (products == null || !products.Any())
                 {
                     return new ErrorDataResult<IEnumerable<ProductDto>>(Array.Empty<ProductDto>(), "Aradığınız kategoride ürün bulunamadı!");
@@ -267,8 +534,14 @@ namespace Business.Concrete
                     Description = p.Description,
                     Price = p.Price,
                     Stock = p.Stock,
+                    Color = p.Color,
+                    Size = p.Size,
+                    CategoryName = p.Category.Name,
                     CategoryId = categoryId,
-                    SubcategoryId = p.SubcategoryId
+                    SubcategoryName = p.Subcategory.Name,
+                    SubcategoryId = p.SubcategoryId,
+                    CreatedAt = p.CreatedAt,
+                    ImageUrls = p.Images.Select(img => img.FileUrl).ToList()
                 });
                 return new SuccessDataResult<IEnumerable<ProductDto>>(productDtos);
             }
@@ -283,7 +556,7 @@ namespace Business.Concrete
             }
         }
 
-        public async Task<IDataResult<IEnumerable<ProductDto>>> GetProductsBySubcategoryId(int subcategoryId)
+        public async Task<IDataResult<IEnumerable<ProductDto>>> GetProductsBySubcategoryId(int subcategoryId, string orderBy)
         {
             try
             {
@@ -292,7 +565,16 @@ namespace Business.Concrete
                 {
                     return new ErrorDataResult<IEnumerable<ProductDto>>("Aradığınız kategori bulunamadı!", "NotFound");
                 }
-                IEnumerable<Product> products = await _unitOfWork.Products.GetProductsBySubcategoryIdAsync(subcategoryId).ConfigureAwait(false);
+                IEnumerable<Product> products;
+                if (orderBy == null)
+                {
+                    products = await _unitOfWork.Products.GetProductsBySubcategoryIdAsync(subcategoryId).ConfigureAwait(false);
+                }
+                else
+                {
+                    products = await _unitOfWork.Products.GetProductsBySubcategoryIdAsync(subcategoryId, orderBy).ConfigureAwait(false);
+                }
+
                 if (products == null || !products.Any())
                 {
                     return new ErrorDataResult<IEnumerable<ProductDto>>(Array.Empty<ProductDto>(), "Aradığınız kategoride ürün bulunamadı!");
@@ -304,8 +586,14 @@ namespace Business.Concrete
                     Description = p.Description,
                     Price = p.Price,
                     Stock = p.Stock,
+                    Color = p.Color,
+                    Size = p.Size,
+                    CategoryName = p.Category.Name,
                     CategoryId = p.CategoryId,
-                    SubcategoryId = p.SubcategoryId
+                    SubcategoryName = subcategory.Name,
+                    SubcategoryId = p.SubcategoryId,
+                    CreatedAt = p.CreatedAt,
+                    ImageUrls = p.Images.Select(img => img.FileUrl).ToList()
                 });
                 return new SuccessDataResult<IEnumerable<ProductDto>>(producDtos);
             }
@@ -320,24 +608,5 @@ namespace Business.Concrete
             }
         }
 
-        public async Task<IResult> UpdateAsync(ProductUpdateDto productUpdateDto)
-        {
-            Product product = await _unitOfWork.Products.GetAsync(p => p.Id == productUpdateDto.Id).ConfigureAwait(false);
-            if (product != null)
-            {
-                product.Name = productUpdateDto.Name;
-                product.Color = productUpdateDto.Color;
-                product.Size = productUpdateDto.Size;
-                product.Description = productUpdateDto.Description;
-                product.Price = productUpdateDto.Price;
-                product.Stock = productUpdateDto.Stock;
-                product.CategoryId = productUpdateDto.CategoryId;
-                product.SubcategoryId = productUpdateDto.SubcategoryId;
-                await _unitOfWork.Products.UpdateAsync(product).ConfigureAwait(false);
-                await _unitOfWork.SaveChangesAsync().ConfigureAwait(false);
-                return new SuccessDataResult<ProductUpdateDto>("Product updated successfuly");
-            }
-            return new ErrorDataResult<ProductUpdateDto>(productUpdateDto, "Product could not be updated");
-        }
     }
 }
