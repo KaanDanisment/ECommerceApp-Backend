@@ -19,6 +19,8 @@ namespace DataAccess.Abstract
         ISubcategoryRepository Subcategories { get; }
         IOrderProductRepository OrderProducts { get; }
         IAddressRepository Addresses { get; }
+        ICartRespository Carts { get; }
+        ICartItemRepository CartItems { get; }
         IGenericRepository<IdentityUserToken<string>> UserTokens { get; }
         
         Task<IDbContextTransaction> BeginTransactionAsync();

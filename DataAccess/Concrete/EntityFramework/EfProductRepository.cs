@@ -23,19 +23,28 @@ namespace DataAccess.Concrete.EntityFramework
 
         public async Task<IEnumerable<Product>> GetLatestProducts()
         {
-            return await _context.Products
-                .Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)
-                .OrderByDescending(p => p.CreatedAt)
+            // En son eklenen 12 farklı isimdeki ürünleri bul
+            var latestProductNames = await _context.Products
+                .GroupBy(p => p.Name)
+                .Select(g => g.OrderByDescending(p => p.CreatedAt).First().Name)
                 .Take(12)
                 .ToListAsync()
                 .ConfigureAwait(false);
+
+            return await _context.Products
+               .Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)
+               .Where(p => latestProductNames.Contains(p.Name))
+               .OrderByDescending(p => p.CreatedAt)
+               .ToListAsync()
+               .ConfigureAwait(false);
         }
 
-        public async Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(int categoryId, string? orderBy = null)
+        public async Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(int categoryId, string? sortBy)
         {
-            if (orderBy != null)
+            if (sortBy != null)
             {
-                var orderedProducts = SortProducts(_context.Products.Where(p => p.CategoryId == categoryId), orderBy);
+
+                IQueryable<Product> orderedProducts = SortProducts(_context.Products.Where(p => p.CategoryId == categoryId), sortBy);
                 return await orderedProducts
                     .Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)
                     .ToListAsync()
@@ -48,11 +57,12 @@ namespace DataAccess.Concrete.EntityFramework
                 .ConfigureAwait(false);
         }
 
-        public async Task<IEnumerable<Product>> GetProductsBySubcategoryIdAsync(int subcategoryId, string sortBy)
+        public async Task<IEnumerable<Product>> GetProductsBySubcategoryIdAsync(int subcategoryId, string? sortBy)
         {
             if (sortBy != null)
             {
-                var orderedProducts = SortProducts(_context.Products.Where(p => p.SubcategoryId == subcategoryId), sortBy);
+
+                IQueryable<Product> orderedProducts = SortProducts(_context.Products.Where(p => p.SubcategoryId == subcategoryId), sortBy);
                 return await orderedProducts
                     .Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)
                     .ToListAsync()

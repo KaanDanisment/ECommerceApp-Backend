@@ -1,4 +1,5 @@
-﻿using Core.Utilities.Pagination;
+﻿using Core.Utilities.GroupedProductsResult;
+using Core.Utilities.Pagination;
 using Core.Utilities.Results.Abstract;
 using Entities.Dtos;
 using System;
@@ -16,8 +17,11 @@ namespace Business.Abstract
         Task<IDataResult<ProductCreateDto>> AddAsync(ProductCreateDto productCreateDto);
         Task<IResult> UpdateAsync(ProductUpdateDto productUpdateDto);
         Task<IResult> DeleteAsync(int id);
-        Task<IDataResult<IEnumerable<ProductDto>>> GetProductsByCategoryId(int categoryId, string? orderBy);
-        Task<IDataResult<IEnumerable<ProductDto>>> GetProductsBySubcategoryId(int subcategoryId, string? orderBy);
-        Task<IDataResult<IEnumerable<ProductDto>>> GetLatestProductsAsync();
+        Task<IDataResult<IEnumerable<ProductDto>>> GetProductsByCategoryId(int categoryId, string? sortBy);
+        Task<IDataResult<IEnumerable<ProductDto>>> GetProductsBySubcategoryId(int subcategoryId, string? sortBy);
+        Task<IDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>> GetLatestProductsAsync();
+        Task<IDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>> GetGroupedProductsByCategoryId(int categoryId, string? sortBy);
+        Task<IDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>> GetGroupedProductsBySubcategoryId(int subcategoryId, string? sortBy);
+        Task<IDataResult<GroupedProductsResult<ProductDto>>> GetGroupedProductByProductId(int productId);
     }
 }

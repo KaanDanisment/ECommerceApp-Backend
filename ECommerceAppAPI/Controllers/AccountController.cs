@@ -14,13 +14,11 @@ namespace ECommerceAppAPI.Controllers
     public class AccountController : Controller
     {
         private readonly IAccountService _accountManager;
-        private readonly IAuthService _authManager;
         private readonly UserManager<User> _userManager;
 
-        public AccountController(IAccountService accountManager, IAuthService authManager, UserManager<User> userManager)
+        public AccountController(IAccountService accountManager, UserManager<User> userManager)
         {
             _accountManager = accountManager;
-            _authManager = authManager;
             _userManager = userManager;
         }
 

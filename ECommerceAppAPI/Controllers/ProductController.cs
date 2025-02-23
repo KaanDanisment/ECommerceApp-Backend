@@ -1,4 +1,7 @@
 ﻿using Business.Abstract;
+using Core.Utilities.GroupedProductsResult;
+using Core.Utilities.Pagination;
+using Core.Utilities.Results.Abstract;
 using Core.Utilities.Results.Concrete;
 using Entities.Dtos;
 using Microsoft.AspNetCore.Mvc;
@@ -19,7 +22,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet("getall")]
         public async Task<IActionResult> GetlAll([FromQuery] int? page, [FromQuery] string? sortBy)
         {
-            var result = await _productManager.GetAllAsync(page,sortBy).ConfigureAwait(false);
+            var result = await _productManager.GetAllAsync(page, sortBy).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<ProductDto> errorDataResult)
@@ -82,7 +85,7 @@ namespace ECommerceAppAPI.Controllers
             var result = await _productManager.UpdateAsync(productUpdateDto).ConfigureAwait(false);
             if (!result.Success)
             {
-                if(result is ErrorResult errorResult)
+                if (result is ErrorResult errorResult)
                 {
                     if (errorResult.ErrorType == "NotFound")
                     {
@@ -129,7 +132,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet("getbycategoryid/{categoryId}")]
         public async Task<IActionResult> GetProductsByCategoryId(int categoryId, [FromQuery] string? sortBy)
         {
-            var result = await _productManager.GetProductsByCategoryId(categoryId,sortBy).ConfigureAwait(false);
+            var result = await _productManager.GetProductsByCategoryId(categoryId, sortBy).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<IEnumerable<ProductDto>> errorDataResult)
@@ -151,7 +154,7 @@ namespace ECommerceAppAPI.Controllers
         [HttpGet("getbysubcategoryid/{subcategoryId}")]
         public async Task<IActionResult> GetProductsBySubcategoryId(int subcategoryId, [FromQuery] string? sortBy)
         {
-            var result = await _productManager.GetProductsBySubcategoryId(subcategoryId,sortBy).ConfigureAwait(false);
+            var result = await _productManager.GetProductsBySubcategoryId(subcategoryId, sortBy).ConfigureAwait(false);
             if (!result.Success)
             {
                 if (result is ErrorDataResult<IEnumerable<ProductDto>> errorDataResult)
@@ -184,6 +187,71 @@ namespace ECommerceAppAPI.Controllers
                     }
                 }
                 return Ok(result.Data);
+            }
+            return Ok(result.Data);
+        }
+
+        [HttpGet("getGroupedProductsByCategoryId/{categoryId}")]
+        public async Task<IActionResult> GetGroupedProductsByCategoryId(int categoryId, [FromQuery] string? sortBy)
+        {
+            var result = await _productManager.GetGroupedProductsByCategoryId(categoryId, sortBy).ConfigureAwait(false);
+            if (!result.Success)
+            {
+                if (result is ErrorDataResult<GroupedProductsResult<ProductDto>> errorDataResult)
+                {
+                    if (errorDataResult.ErrorType == "SystemError")
+                    {
+                        return StatusCode(500, errorDataResult.Message);
+                    }
+                    else if (errorDataResult.ErrorType == "NotFound")
+                    {
+                        return StatusCode(500, errorDataResult.Message);
+                    }
+                    return Ok(result.Data);
+                }
+            }
+            return Ok(result.Data);
+        }
+
+        [HttpGet("getGroupedProductsBySubcategoryId/{subcategoryId}")]
+        public async Task<IActionResult> GetGroupedProductsBySubcategoryId(int subcategoryId, [FromQuery] string? sortBy)
+        {
+            var result = await _productManager.GetGroupedProductsBySubcategoryId(subcategoryId, sortBy).ConfigureAwait(false);
+            if (!result.Success)
+            {
+                if (result is ErrorDataResult<GroupedProductsResult<ProductDto>> errorDataResult)
+                {
+                    if (errorDataResult.ErrorType == "SystemError")
+                    {
+                        return StatusCode(500, errorDataResult.Message);
+                    }
+                    else if (errorDataResult.ErrorType == "NotFound")
+                    {
+                        return StatusCode(500, errorDataResult.Message);
+                    }
+                    return Ok(result.Data);
+                }
+            }
+            return Ok(result.Data);
+        }
+
+        [HttpGet("getGroupedProductByProductId/{productId}")]
+        public async Task<IActionResult> GetGroupedProductByProductId(int productId)
+        {
+            var result = await _productManager.GetGroupedProductByProductId(productId).ConfigureAwait(false);
+            if (!result.Success)
+            {
+                if (result is ErrorDataResult<GroupedProductsResult<ProductDto>> errorDataResult)
+                {
+                    if (errorDataResult.ErrorType == "SystemError")
+                    {
+                        return StatusCode(500, errorDataResult.Message);
+                    }
+                    else if (errorDataResult.ErrorType == "NotFound")
+                    {
+                        return StatusCode(500, errorDataResult.Message);
+                    }
+                }
             }
             return Ok(result.Data);
         }

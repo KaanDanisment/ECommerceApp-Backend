@@ -46,10 +46,13 @@ namespace ECommerceAppAPI.Extensions
             services.AddScoped<ISubcategoryRepository, EfSubcategoryRepository>();
             services.AddScoped<IOrderProductRepository, EfOrderProductRepository>();
             services.AddScoped<IAddressRepository, EfAddressRepository>();
+            services.AddScoped<ICartRespository, EfCartRepository>();
+            services.AddScoped<ICartItemRepository, EfCartItemRepository>();
             services.AddScoped(typeof(IGenericRepository<IdentityUserToken<string>>),
                 provider =>
                     new EfGenericRepositoryBase<IdentityUserToken<string>, ECommerceContext>(
                         provider.GetService<ECommerceContext>()));
+            services.AddSingleton<IRedisService,RedisManager>();
 
 
             //Services
@@ -64,7 +67,19 @@ namespace ECommerceAppAPI.Extensions
             services.AddScoped<RefreshTokenHelper, RefreshTokenHelper>();
             services.AddScoped<IAdminService, AdminManager>();
             services.AddScoped<IAwsS3Service, AwsS3Manager>();
+            services.AddScoped<ICartService, CartManager>();
 
+            //Session Services
+            services.AddDistributedMemoryCache();
+            services.AddSession(options =>
+            {
+                options.IdleTimeout = TimeSpan.FromMinutes(5);
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+            });
+
+            //Add IHttpContextAccessor
+            services.AddHttpContextAccessor();
 
             //Authentication
             var tokenOptions = configuration.GetSection("TokenOptions").Get<TokenOptions>();

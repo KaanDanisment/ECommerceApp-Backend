@@ -1,4 +1,5 @@
 ﻿using Business.Abstract;
+using Core.Utilities.GroupedProductsResult;
 using Core.Utilities.Pagination;
 using Core.Utilities.Results.Abstract;
 using Core.Utilities.Results.Concrete;
@@ -6,7 +7,6 @@ using DataAccess.Abstract;
 using Entities;
 using Entities.Dtos;
 using Entities.Validators;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -50,7 +50,6 @@ namespace Business.Concrete
             }
 
             using var transaction = await _unitOfWork.BeginTransactionAsync();
-
             try
             {
 
@@ -66,14 +65,15 @@ namespace Business.Concrete
                     SubcategoryId = productCreateDto.SubcategoryId,
                 };
                 await _unitOfWork.Products.AddAsync(product);
-                await _unitOfWork.SaveChangesAsync();
 
                 var result = await _imageManager.AddAsync(productCreateDto.Images, product.Id);
                 if (!result.Success)
                 {
+                    await transaction.RollbackAsync();
                     return new ErrorDataResult<ProductCreateDto>(result.Message, "SystemError");
                 }
 
+                await _unitOfWork.SaveChangesAsync();
                 await transaction.CommitAsync();
                 return new SuccessDataResult<ProductCreateDto>(productCreateDto);
             }
@@ -202,8 +202,6 @@ namespace Business.Concrete
                     }
                 }
 
-
-
                 await _unitOfWork.Products.UpdateAsync(product);
                 await _unitOfWork.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -250,10 +248,14 @@ namespace Business.Concrete
                         }
                     }
 
-                    foreach (var image in product.Images)
+                    var sameNameProducts = await _unitOfWork.Products.GetAllAsync(p => p.Name == product.Name);
+                    if (!sameNameProducts.Any())
                     {
-                        var key = image.FileUrl.Split("/").Last();
-                        await _awsS3Manager.DeleteFileAsync(key);
+                        foreach (var image in product.Images)
+                        {
+                            var key = image.FileUrl.Split("/").Last();
+                            await _awsS3Manager.DeleteFileAsync(key);
+                        }
                     }
 
                     await _unitOfWork.Products.DeleteAsync(product);
@@ -276,7 +278,6 @@ namespace Business.Concrete
 
         private async Task<IDataResult<IEnumerable<Product>>> SortProducts(int? page, string sortBy)
         {
-
             try
             {
                 IEnumerable<Product> products;
@@ -349,7 +350,8 @@ namespace Business.Concrete
                 {
                     if (page > 0)
                     {
-                        products = (await _unitOfWork.Products.GetAllAsync(include: p => p.Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)).ConfigureAwait(false))
+                        products = (await _unitOfWork.Products.GetAllAsync(
+                            include: p => p.Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)).ConfigureAwait(false))
                             .Skip((pageNumber - 1) * pageSize)
                             .Take(pageSize)
                             .ToList();
@@ -357,7 +359,8 @@ namespace Business.Concrete
                     else
                     {
                         pageSize = totalItemCount;
-                        products = await _unitOfWork.Products.GetAllAsync(include: p => p.Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)).ConfigureAwait(false);
+                        products = await _unitOfWork.Products.GetAllAsync(
+                            include: p => p.Include(p => p.Images).Include(p => p.Category).Include(p => p.Subcategory)).ConfigureAwait(false);
                     }
                 }
                 else
@@ -468,20 +471,22 @@ namespace Business.Concrete
             }
         }
 
-        public async Task<IDataResult<IEnumerable<ProductDto>>> GetLatestProductsAsync()
+        public async Task<IDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>> GetLatestProductsAsync()
         {
             try
             {
                 IEnumerable<Product> products = await _unitOfWork.Products.GetLatestProducts().ConfigureAwait(false);
                 if (products != null || products.Any())
                 {
-                    IEnumerable<ProductDto> producDtos = products.Select(p => new ProductDto()
+                    IEnumerable<ProductDto> productDtos = products.Select(p => new ProductDto()
                     {
                         Id = p.Id,
                         Name = p.Name,
                         Description = p.Description,
                         Price = p.Price,
                         Stock = p.Stock,
+                        Color = p.Color,
+                        Size = p.Size,
                         CategoryName = p.Category.Name,
                         CategoryId = p.CategoryId,
                         SubcategoryName = p.Subcategory.Name,
@@ -489,9 +494,14 @@ namespace Business.Concrete
                         CreatedAt = p.CreatedAt,
                         ImageUrls = p.Images.Select(img => img.FileUrl).ToList()
                     });
-                    return new SuccessDataResult<IEnumerable<ProductDto>>(producDtos);
+
+                    IEnumerable<GroupedProductsResult<ProductDto>> groupedProductsResult = productDtos
+                   .GroupBy(p => new { p.Name, p.Color })
+                   .Select(g => new GroupedProductsResult<ProductDto>(g))
+                   .ToList();
+                    return new SuccessDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>(groupedProductsResult);
                 }
-                return new SuccessDataResult<IEnumerable<ProductDto>>(Array.Empty<ProductDto>(), "Ürün listesi boş.");
+                return new SuccessDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>(Array.Empty<GroupedProductsResult<ProductDto>>(), "Ürün listesi boş.");
             }
             catch (Exception ex)
             {
@@ -500,11 +510,11 @@ namespace Business.Concrete
                     Message = ex.Message,
                     InnerException = ex.InnerException?.Message
                 };
-                return new ErrorDataResult<IEnumerable<ProductDto>>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+                return new ErrorDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
             }
         }
 
-        public async Task<IDataResult<IEnumerable<ProductDto>>> GetProductsByCategoryId(int categoryId, string orderBy)
+        public async Task<IDataResult<IEnumerable<ProductDto>>> GetProductsByCategoryId(int categoryId, string? sortBy)
         {
             try
             {
@@ -514,19 +524,14 @@ namespace Business.Concrete
                     return new ErrorDataResult<IEnumerable<ProductDto>>("Aradığınız kategori bulunamadı!", "NotFound");
                 }
                 IEnumerable<Product> products;
-                if (orderBy == null)
-                {
-                    products = await _unitOfWork.Products.GetProductsByCategoryIdAsync(categoryId).ConfigureAwait(false);
-                }
-                else
-                {
-                    products = await _unitOfWork.Products.GetProductsByCategoryIdAsync(categoryId, orderBy).ConfigureAwait(false);
-                }
+
+                products = await _unitOfWork.Products.GetProductsByCategoryIdAsync(categoryId, sortBy).ConfigureAwait(false);
 
                 if (products == null || !products.Any())
                 {
                     return new ErrorDataResult<IEnumerable<ProductDto>>(Array.Empty<ProductDto>(), "Aradığınız kategoride ürün bulunamadı!");
                 }
+
                 IEnumerable<ProductDto> productDtos = products.Select(p => new ProductDto()
                 {
                     Id = p.Id,
@@ -556,7 +561,7 @@ namespace Business.Concrete
             }
         }
 
-        public async Task<IDataResult<IEnumerable<ProductDto>>> GetProductsBySubcategoryId(int subcategoryId, string orderBy)
+        public async Task<IDataResult<IEnumerable<ProductDto>>> GetProductsBySubcategoryId(int subcategoryId, string? sortBy)
         {
             try
             {
@@ -566,14 +571,8 @@ namespace Business.Concrete
                     return new ErrorDataResult<IEnumerable<ProductDto>>("Aradığınız kategori bulunamadı!", "NotFound");
                 }
                 IEnumerable<Product> products;
-                if (orderBy == null)
-                {
-                    products = await _unitOfWork.Products.GetProductsBySubcategoryIdAsync(subcategoryId).ConfigureAwait(false);
-                }
-                else
-                {
-                    products = await _unitOfWork.Products.GetProductsBySubcategoryIdAsync(subcategoryId, orderBy).ConfigureAwait(false);
-                }
+
+                products = await _unitOfWork.Products.GetProductsBySubcategoryIdAsync(subcategoryId, sortBy).ConfigureAwait(false);
 
                 if (products == null || !products.Any())
                 {
@@ -608,5 +607,156 @@ namespace Business.Concrete
             }
         }
 
+        public async Task<IDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>> GetGroupedProductsByCategoryId(int categoryId, string? sortBy)
+        {
+            try
+            {
+                Category category = await _unitOfWork.Categories.GetAsync(c => c.Id == categoryId).ConfigureAwait(false);
+                if (category == null)
+                {
+                    return new ErrorDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>("Aradığınız kategori bulunamadı!", "NotFound");
+                }
+
+                IEnumerable<Product> products = await _unitOfWork.Products.GetProductsByCategoryIdAsync(categoryId, sortBy);
+
+                if (products == null || !products.Any())
+                {
+                    return new ErrorDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>(Array.Empty<GroupedProductsResult<ProductDto>>(), "Aradığınız kategoride ürün bulunamadı!");
+                }
+
+                IEnumerable<ProductDto> productDtos = products.Select(p => new ProductDto()
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Color = p.Color,
+                    Size = p.Size,
+                    Description = p.Description,
+                    Price = p.Price,
+                    Stock = p.Stock,
+                    CategoryName = p.Category.Name,
+                    CategoryId = p.CategoryId,
+                    SubcategoryName = p.Subcategory.Name,
+                    SubcategoryId = p.SubcategoryId,
+                    CreatedAt = p.CreatedAt,
+                    ImageUrls = p.Images.Select(img => img.FileUrl).ToList()
+                });
+
+                IEnumerable<GroupedProductsResult<ProductDto>> groupedProductsResult = productDtos
+                    .GroupBy(p => new { p.Name, p.Color })
+                    .Select(g => new GroupedProductsResult<ProductDto>(g))
+                    .ToList();
+                return new SuccessDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>(groupedProductsResult);
+            }
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+        }
+
+        public async Task<IDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>> GetGroupedProductsBySubcategoryId(int subcategoryId, string? sortBy)
+        {
+            try
+            {
+                Subcategory subcategory = await _unitOfWork.Subcategories.GetAsync(s => s.Id == subcategoryId).ConfigureAwait(false);
+                if (subcategory == null)
+                {
+                    return new ErrorDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>("Aradığınız alt kategori bulunamadı!", "NotFound");
+                }
+
+                IEnumerable<Product> products = await _unitOfWork.Products.GetProductsBySubcategoryIdAsync(subcategoryId, sortBy);
+                if (products == null || !products.Any())
+                {
+                    return new ErrorDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>(Array.Empty<GroupedProductsResult<ProductDto>>(), "Aradığınız alt kategoride ürün bulunamadı!");
+                }
+
+                IEnumerable<ProductDto> productDtos = products.Select(p => new ProductDto()
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Color = p.Color,
+                    Size = p.Size,
+                    Description = p.Description,
+                    Price = p.Price,
+                    Stock = p.Stock,
+                    CategoryName = p.Category.Name,
+                    CategoryId = p.CategoryId,
+                    SubcategoryName = p.Subcategory.Name,
+                    SubcategoryId = p.SubcategoryId,
+                    CreatedAt = p.CreatedAt,
+                    ImageUrls = p.Images.Select(img => img.FileUrl).ToList()
+                });
+                IEnumerable<GroupedProductsResult<ProductDto>> groupedProductsResult = productDtos
+                        .GroupBy(p => new { p.Name, p.Color })
+                        .Select(g => new GroupedProductsResult<ProductDto>(g))
+                        .ToList();
+
+                return new SuccessDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>(groupedProductsResult);
+            }
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorDataResult<IEnumerable<GroupedProductsResult<ProductDto>>>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+
+        }
+
+        public async Task<IDataResult<GroupedProductsResult<ProductDto>>> GetGroupedProductByProductId(int productId)
+        {
+            try
+            {
+                Product? product = await _unitOfWork.Products.GetAsync(p => p.Id == productId,
+                    include: p => p.Include(p => p.Images)
+                    .Include(p => p.Category)
+                    .Include(p => p.Subcategory))
+                    .ConfigureAwait(false);
+
+                if (product == null)
+                {
+                    return new ErrorDataResult<GroupedProductsResult<ProductDto>>("Aradığınız ürün bulunamadı!", "NotFound");
+                }
+
+                IEnumerable<Product> products = await _unitOfWork.Products.GetProductsBySubcategoryIdAsync(product.SubcategoryId, null).ConfigureAwait(false);
+
+                IEnumerable<Product> resultProducts = products.Where(p => p.Name == product.Name && p.Color == product.Color);
+
+                IEnumerable<ProductDto> productDtos = resultProducts.Select(p => new ProductDto()
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Color = p.Color,
+                    Size = p.Size,
+                    Description = p.Description,
+                    Price = p.Price,
+                    Stock = p.Stock,
+                    CategoryName = p.Category.Name,
+                    CategoryId = p.CategoryId,
+                    SubcategoryName = p.Subcategory.Name,
+                    SubcategoryId = p.SubcategoryId,
+                    CreatedAt = p.CreatedAt,
+                    ImageUrls = p.Images.Select(img => img.FileUrl).ToList()
+                });
+
+                GroupedProductsResult<ProductDto> groupedProductsResult = new GroupedProductsResult<ProductDto>(productDtos);
+                return new SuccessDataResult<GroupedProductsResult<ProductDto>>(groupedProductsResult);
+            }
+            catch (Exception ex)
+            {
+                var errorDetails = new
+                {
+                    Message = ex.Message,
+                    InnerException = ex.InnerException?.Message
+                };
+                return new ErrorDataResult<GroupedProductsResult<ProductDto>>(System.Text.Json.JsonSerializer.Serialize(errorDetails), "SystemError");
+            }
+        }
     }
 }

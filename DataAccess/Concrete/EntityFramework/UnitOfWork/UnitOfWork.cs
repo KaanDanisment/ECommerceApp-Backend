@@ -22,9 +22,15 @@ namespace DataAccess.Concrete.EntityFramework.UnitOfWork
         public ISubcategoryRepository Subcategories { get; }
         public IOrderProductRepository OrderProducts { get; }
         public IAddressRepository Addresses { get; }
+        public ICartRespository Carts { get; }
+        public ICartItemRepository CartItems { get; }
         public IGenericRepository<IdentityUserToken<string>> UserTokens { get; }
 
-        public UnitOfWork(ECommerceContext context, ICategoryRepository categoryRepository, IProductRepository productRepository, IOrderRepository orderRepository, IImageRepository images, ISubcategoryRepository subcategories, IGenericRepository<IdentityUserToken<string>> userTokens, IOrderProductRepository orderProducts, IAddressRepository addresses)
+        public UnitOfWork(ECommerceContext context, ICategoryRepository categoryRepository, IProductRepository productRepository,
+                                                    IOrderRepository orderRepository, IImageRepository images,
+                                                    ISubcategoryRepository subcategories, IGenericRepository<IdentityUserToken<string>> userTokens,
+                                                    IOrderProductRepository orderProducts, IAddressRepository addresses,
+                                                    ICartRespository carts, ICartItemRepository cartItems)
         {
             _context = context;
             Categories = categoryRepository;
@@ -35,6 +41,8 @@ namespace DataAccess.Concrete.EntityFramework.UnitOfWork
             UserTokens = userTokens;
             OrderProducts = orderProducts;
             Addresses = addresses;
+            Carts = carts;
+            CartItems = cartItems;
         }
 
         public void Dispose()

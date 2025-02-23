@@ -90,13 +90,13 @@ namespace Business.Concrete
 
             try
             {
-            var user = await _userManager.FindByEmailAsync(userLoginDto.Email).ConfigureAwait(false);
-            if (user == null) { return new ErrorDataResult<User>("Mail adresi kayıtlı değil! Lütfen kayıt olun.", "NotFound"); }
-                
-            var result = await _signInManager.CheckPasswordSignInAsync(user, userLoginDto.Password, false).ConfigureAwait(false);
-            if (!result.Succeeded) { return new ErrorDataResult<User>("Hatalı şifre! Lütfen tekrar deneyin.", "BadRequest"); }
+                var user = await _userManager.FindByEmailAsync(userLoginDto.Email).ConfigureAwait(false);
+                if (user == null) { return new ErrorDataResult<User>("Mail adresi kayıtlı değil! Lütfen kayıt olun.", "NotFound"); }
 
-                return new SuccessDataResult<User>(user,"Giriş başarılı!");
+                var result = await _signInManager.CheckPasswordSignInAsync(user, userLoginDto.Password, false).ConfigureAwait(false);
+                if (!result.Succeeded) { return new ErrorDataResult<User>("Hatalı şifre! Lütfen tekrar deneyin.", "BadRequest"); }
+
+                return new SuccessDataResult<User>(user, "Giriş başarılı!");
             }
             catch (Exception ex)
             {

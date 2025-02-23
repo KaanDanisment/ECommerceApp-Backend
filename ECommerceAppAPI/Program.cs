@@ -1,4 +1,5 @@
-﻿using ECommerceAppAPI.Extensions;
+﻿using Business.Abstract;
+using ECommerceAppAPI.Extensions;
 using Microsoft.Extensions.FileProviders;
 
 
@@ -33,12 +34,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+//Redis Connection
+var redisService = app.Services.GetRequiredService<IRedisService>();
+redisService.Connect();
+
 app.UseHttpsRedirection();
 
 app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseSession();
 
 app.MapControllers();
 

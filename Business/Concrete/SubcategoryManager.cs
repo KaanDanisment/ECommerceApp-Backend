@@ -54,6 +54,7 @@ namespace Business.Concrete
                     var fileUrl = await _awsS3Manager.UploadFileAsync(subcategoryCreateDto.Image);
                     if (!fileUrl.Success)
                     {
+                        await transaction.RollbackAsync();
                         return new ErrorResult(fileUrl.Message, "SystemError");
                     }
                     subcategory.ImageUrl = fileUrl.Data;
